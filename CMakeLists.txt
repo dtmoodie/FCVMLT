@@ -1,0 +1,40 @@
+cmake_minimum_required(VERSION 2.8)
+PROJECT(FCVMLT)
+
+FIND_PACKAGE(QT4 REQUIRED)
+set(OPENCV_DIR "C:/opencv245/build")
+FIND_PACKAGE(OPENCV REQUIRED)
+FIND_PACKAGE(BOOST REQUIRED COMPONENETS threads)
+
+file(GLOB sources "*.cpp")
+file(GLOB headers "*.h")
+file(GLOB forms "*.ui")
+
+QT4_WRAP_CPP(headers_moc ${headers})
+QT4_WRAP_UI(forms_headers ${forms})
+set(CMAKE_INCLUDE_CURRENT_DIR 1)
+set(BOOST_ALL_DYN_LINK)
+
+#add_definitions(-DKEITH_BUILD)
+
+INCLUDE(${QT_USE_FILE})
+INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${OPENCV_INCLUDE_DIR})
+
+LINK_DIRECTORIES(${Boost_LIBRARY_DIRS})
+LINK_DIRECTORIES(${OPENCV_LIBRARY_DIRS})
+
+ADD_DEFINITIONS(${QT_DEFINITIONS})
+
+ADD_EXECUTABLE(FCVMLT 
+	${sources} 
+	${headers_moc} 
+	${headers} 
+	${forms_headers}
+)
+
+TARGET_LINK_LIBRARIES(FCVMLT 
+	${QT_LIBRARIES} 
+	${OpenCV_LIBS} 
+	${Boost_LIBRARIES}
+)
