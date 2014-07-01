@@ -12,50 +12,52 @@ TARGET = FCVMLT
 TEMPLATE = app
 
 
-SOURCES += main.cpp\
-        mainwindow.cpp \
-    container.cpp \
-    filterwidget.cpp \
-    imageedit.cpp \
-    imgsourceswidget.cpp \
-    imgFilter.cpp \
-    filterselectwidget.cpp \
-    filtersettingwidget.cpp \
-    imgstatswidget.cpp \
-    statsettingwidget.cpp \
-    matview.cpp \
-    mlwidget.cpp \
-    compoundimgfunction.cpp \
-    qtcontainer.cpp \
-    savestreamdialog.cpp
+SOURCES += SRC/main.cpp\
+        SRC/mainwindow.cpp \
+    SRC/container.cpp \
+    SRC/filterwidget.cpp \
+    SRC/imageedit.cpp \
+    SRC/imgsourceswidget.cpp \
+    SRC/imgFilter.cpp \
+    SRC/filterselectwidget.cpp \
+    SRC/filtersettingwidget.cpp \
+    SRC/imgstatswidget.cpp \
+    SRC/statsettingwidget.cpp \
+    SRC/matview.cpp \
+    SRC/mlwidget.cpp \
+    SRC/compoundimgfunction.cpp \
+    SRC/qtcontainer.cpp \
+    SRC/savestreamdialog.cpp \
+    SRC/registrationdialog.cpp
+HEADERS  += headers/mainwindow.h \
+    headers/container.h \
+    headers/filterwidget.h \
+    headers/imageedit.h \
+    headers/imgsourceswidget.h \
+    headers/imgFilter.h \
+    headers/filterselectwidget.h \
+    headers/filtersettingwidget.h \
+    headers/imgstatswidget.h \
+    headers/statsettingwidget.h \
+    headers/matview.h \
+    headers/mlwidget.h \
+    headers/compoundimgfunction.h \
+    headers/qtcontainer.h \
+    headers/savestreamdialog.h \
+    headers/registrationdialog.h
 
-HEADERS  += mainwindow.h \
-    container.h \
-    filterwidget.h \
-    imageedit.h \
-    imgsourceswidget.h \
-    imgFilter.h \
-    filterselectwidget.h \
-    filtersettingwidget.h \
-    imgstatswidget.h \
-    statsettingwidget.h \
-    matview.h \
-    mlwidget.h \
-    compoundimgfunction.h \
-    qtcontainer.h \
-    savestreamdialog.h
-
-FORMS    += mainwindow.ui \
-    filterwidget.ui \
-    imageedit.ui \
-    imgsourceswidget.ui \
-    filterselectwidget.ui \
-    filtersettingwidget.ui \
-    imgstatswidget.ui \
-    statsettingwidget.ui \
-    mlwidget.ui \
-    compoundimgfunction.ui \
-    savestreamdialog.ui
+FORMS    += UIs/mainwindow.ui \
+    UIs/filterwidget.ui \
+    UIs/imageedit.ui \
+    UIs/imgsourceswidget.ui \
+    UIs/filterselectwidget.ui \
+    UIs/filtersettingwidget.ui \
+    UIs/imgstatswidget.ui \
+    UIs/statsettingwidget.ui \
+    UIs/mlwidget.ui \
+    UIs/compoundimgfunction.ui \
+    UIs/savestreamdialog.ui \
+    UIs/registrationdialog.ui
 
 
 INCLUDEPATH += C:/Opencv248/build/include
