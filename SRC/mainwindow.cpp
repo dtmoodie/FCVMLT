@@ -129,19 +129,20 @@ MainWindow::MainWindow(QWidget *parent) :
 
 
     // ***************************** Machine Learning Widget Setup **************************
-    machineLearning = new mlWidget(this,sources->sourceList);
-    mlDock = new QDockWidget(this);
-    mlDock->setAllowedAreas(Qt::TopDockWidgetArea       |
-                                Qt::BottomDockWidgetArea    |
-                                Qt::LeftDockWidgetArea      |
-                                Qt::RightDockWidgetArea);
-    mlDock->setFeatures(QDockWidget::DockWidgetClosable     |
-                            QDockWidget::DockWidgetFloatable    |
-                            QDockWidget::DockWidgetMovable);
-    mlDock->setWidget(machineLearning);
-    mlDock->setWindowTitle("Machine Learning");
-    addDockWidget(Qt::LeftDockWidgetArea,mlDock);
-    mlDock->hide();
+    machineLearning = new mlDialog(this,sources);
+	machineLearning->hide();
+    //mlDock = new QDockWidget(this);
+    //mlDock->setAllowedAreas(Qt::TopDockWidgetArea       |
+    //                            Qt::BottomDockWidgetArea    |
+    //                            Qt::LeftDockWidgetArea      |
+    //                            Qt::RightDockWidgetArea);
+    //mlDock->setFeatures(QDockWidget::DockWidgetClosable     |
+    //                        QDockWidget::DockWidgetFloatable    |
+    //                        QDockWidget::DockWidgetMovable);
+    //mlDock->setWidget(machineLearning);
+    //mlDock->setWindowTitle("Machine Learning");
+    //addDockWidget(Qt::LeftDockWidgetArea,mlDock);
+    //mlDock->hide();
 
 #ifndef KEITH_BUILD
 	// ******************************* Feature extraction **********************************
@@ -163,29 +164,20 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // ***************************** Signals and Slots **************************************
 
-    //connect(sources, SIGNAL(sourceChange(cv::Mat)),     filter,     SLOT(receiveImgChange(cv::Mat)));
-	//connect(sources, SIGNAL(sourceChange(container*)), filter, SLOT(handleImgChange(container*)), Qt::QueuedConnection);
 	connect(sources, SIGNAL(sourceChange(containerPtr)), filter, SLOT(handleImgChange(containerPtr)));
-	//connect(sources, SIGNAL(sourceChange(container*)), this, SLOT(handleSourceChange(container*)), Qt::QueuedConnection);
 	connect(sources, SIGNAL(sourceChange(containerPtr)), stats, SLOT(handleImgChange(containerPtr)));
-	connect(stats,	 SIGNAL(log(QString, int)),			this,		SLOT(handleLog(QString, int)));
 	connect(filter,  SIGNAL(log(QString, int)),			this,		SLOT(handleLog(QString, int)));
 #endif
-    //connect(sources, SIGNAL(sourcePreview(cv::Mat)),    sourceImg,  SLOT(changeImg(cv::Mat)));
-	//connect(sources, SIGNAL(sourcePreview(container*)), sourceImg, SLOT(changeImg(container*)));
 	connect(sources, SIGNAL(sourcePreview(containerPtr)), sourceImg, SLOT(changeImg(containerPtr)));
 	connect(sources, SIGNAL(sourceChange(container*)),	saveDialog, SLOT(handleNewImage(container*)));
 	connect(sources, SIGNAL(viewMatrix(cv::Mat)), this, SLOT(viewMatrix(cv::Mat)));
 
-    //connect(sources, SIGNAL(sourcePreview(container*)), stats,      SLOT(handleImgChange(container*)));
 #ifndef KEITH_BUILD
 	connect(sources->sourceList, SIGNAL(itemSelectionChanged()),machineLearning, SLOT(handleSelectionChange()));
 
     // Triggered when the selected filtered image is changed, updates the display of that image
-	//connect(filter, SIGNAL(filterImgChanged(cv::Mat)), filteredImg, SLOT(changeImg(cv::Mat))); // , Qt::QueuedConnection);
 	connect(filter, SIGNAL(filterImgChanged(containerPtr)), filteredImg, SLOT(changeImg(containerPtr)));
 	connect(filter, SIGNAL(saveImage(cv::Mat, QString)), sources, SLOT(handleSaveImage(cv::Mat, QString)));
-	//connect(filter, SIGNAL(filterImgChanged(cv::Mat)), filteredImg, SLOT(showImage(cv::Mat)));
 
 	connect(filteredImg, SIGNAL(log(QString, int)),		this,		SLOT(handleLog(QString, int)));
 
@@ -196,6 +188,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(sourceImg, SIGNAL(log(QString, int)),		this,		SLOT(handleLog(QString, int)));
 	connect(sourceImg, SIGNAL(label(container*)),		filteredImg,SLOT(changeImg(container*)));
 
+	// ******************************* Image stats signals *****************************************
+	connect(stats, SIGNAL(log(QString, int)), this, SLOT(handleLog(QString, int)));
     connect(stats, SIGNAL(extractedFeatures(cv::Mat, bool)), this,  SLOT(displayMat(cv::Mat, bool)));
     connect(stats, SIGNAL(saveFeatures(cv::Mat,QString)), sources,  SLOT(handleSaveFeatures(cv::Mat,QString)));
 	connect(stats, SIGNAL(viewFeatures(cv::Mat)), this, SLOT(viewMatrix(cv::Mat)));
@@ -213,15 +207,22 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->menuLabel_Images->addAction(filterDock->toggleViewAction());
     ui->menuLabel_Images->addAction(sourceDock->toggleViewAction());
     ui->menuLabel_Images->addAction(statDock->toggleViewAction());
-    ui->menuLabel_Images->addAction(mlDock->toggleViewAction());
+	
+	QAction* mlDialogAction = new QAction(this);
+	mlDialogAction->setText("Machine Learning Wizard");
+	ui->menuLabel_Images->addAction(mlDialogAction);
+	mlDialogAction->setCheckable(true);
+
 	ui->menuLabel_Images->addAction(compoundDock->toggleViewAction());
     ui->actionLabel_Images->setCheckable(true);
-    connect(ui->actionUse_colormap, SIGNAL(toggled(bool)), sourceImg, SLOT(toggleColormap(bool)));
-    connect(ui->actionUse_colormap, SIGNAL(toggled(bool)), filteredImg, SLOT(toggleColormap(bool)));
-	connect(ui->actionLink_Image_Views, SIGNAL(toggled(bool)), this, SLOT(handleLinkViews(bool)));
-	connect(ui->actionMerge_image_displays, SIGNAL(toggled(bool)), this, SLOT(on_actionMergeImageDisplays(bool)));
-	connect(ui->actionRegistration, SIGNAL(triggered()), this, SLOT(handleOpenRegistration()));
-	connect(ui->actionDraw_menu, SIGNAL(triggered()), this, SLOT(handleOpenDrawMenu()));
+
+	connect(mlDialogAction,					SIGNAL(triggered()),   this,		SLOT(on_action_mlDialog_toggled()));
+	connect(ui->actionUse_colormap,			SIGNAL(toggled(bool)), sourceImg,	SLOT(toggleColormap(bool)));
+    connect(ui->actionUse_colormap,			SIGNAL(toggled(bool)), filteredImg, SLOT(toggleColormap(bool)));
+	connect(ui->actionLink_Image_Views,		SIGNAL(toggled(bool)), this,		SLOT(handleLinkViews(bool)));
+	connect(ui->actionMerge_image_displays, SIGNAL(toggled(bool)), this,		SLOT(on_actionMergeImageDisplays(bool)));
+	connect(ui->actionRegistration,			SIGNAL(triggered()),   this,		SLOT(handleOpenRegistration()));
+	connect(ui->actionDraw_menu,			SIGNAL(triggered()),   this,		SLOT(handleOpenDrawMenu()));
 	
 #endif
     ui->centralWidget->setLayout(layout);
@@ -344,7 +345,13 @@ void MainWindow::on_actionFiles_from_disk_triggered()
 	boost::posix_time::time_duration delta = end - start;
 	handleLog("Image loading complete in " + QString::number(delta.total_milliseconds()) + " milliseconds", 0);
 }
+void
+MainWindow::on_action_mlDialog_toggled()
+{
+	machineLearning->updateFeatureSelection();
+	machineLearning->show();
 
+}
 void MainWindow::on_actionFolder_from_disk_triggered()
 {
 
@@ -411,7 +418,7 @@ void MainWindow::on_actionToggle_Source_View_triggered()
 	
 
 }
-
+// Deprciated... I think
 void MainWindow::handleImgLabel(cv::Mat img, int label)
 {
     if(currentSourceImg == NULL) return;
@@ -518,11 +525,6 @@ MainWindow::displayMat(cv::Mat features,bool isImg)
 		//filteredImg->showImage(features);
 		filteredImg->changeImg(features);
     }
-        // Display first row to the console
-        //std::stringstream sstream;
-        //sstream << features.row(0);
-        //QString msg = "Extracted Features: \n" + QString::fromStdString(sstream.str());
-        //console->appendPlainText(msg);
 }
 void 
 MainWindow::on_actionApply_filters_to_all_iamges_triggered()
@@ -555,31 +557,6 @@ void MainWindow::viewMatrix(cv::Mat img)
 	matViewerDlg->setLayout(layout);
 	layout->addWidget(matViewer);
 	matViewerDlg->show();
-	/*
-    QGridLayout* matLayout = new QGridLayout(this);
-
-    // ToDo: Add buttons to allow scrolling of the matrix
-    scrollX = new QSpinBox(matViewerDlg);
-    scrollY = new QSpinBox(matViewerDlg);
-	scrollX->setMaximum(img.cols - 1);
-	scrollY->setMaximum(img.rows - 1);
-	QLabel* colLbl = new QLabel(matViewerDlg);
-	colLbl->setText("Columns: " + QString::number(img.cols));
-	QLabel* rowLbl = new QLabel(matViewerDlg);
-	rowLbl->setText("Rows: " + QString::number(img.rows));
-	QLabel* chLbl = new QLabel(matViewerDlg);
-	chLbl->setText("Channels: " + QString::number(img.channels()));
-    connect(scrollX, SIGNAL(valueChanged(int)), matViewer, SLOT(changeX(int)));
-    connect(scrollY, SIGNAL(valueChanged(int)), matViewer, SLOT(changeY(int)));
-    matLayout->addWidget(matViewer,0,1,4,1);
-    matLayout->addWidget(scrollX,0,0);
-    matLayout->addWidget(scrollY,1,0);
-	matLayout->addWidget(colLbl, 2, 0);
-	matLayout->addWidget(rowLbl, 3, 0);
-	matLayout->addWidget(chLbl, 4, 0);
-    matViewerDlg->setLayout(matLayout);
-    matViewerDlg->show();
-	matViewerDlg->setWindowTitle("Matrix Viewer");*/
 }
 
 void MainWindow::on_actionExtract_Stats_for_all_images_triggered()
@@ -603,8 +580,6 @@ MainWindow::on_actionMergeImageDisplays(bool val)
 	else
 	{
 		disconnect(filteredImg, SIGNAL(sendPairedImage(cv::Mat)), sourceImg, SLOT(receivePairedImage(cv::Mat)));
-		//disconnect(filteredImg, SIGNAL(sendPairedImage(cv::Mat)));
-		//disconnect()
 	}
 	
 }

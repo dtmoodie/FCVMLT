@@ -1324,7 +1324,7 @@ featureContainer::featureContainer(QString absFilePath, QString parentName, QTre
 			name = QString::fromStdString((std::string)fs["name"]);
 			//cv::FileNode pts = fs["keyPoints"];
 			// TODO fix keypoint loading with opencv 3.0
-			fs["keyPoints"] >> keyPts;
+			//fs["keyPoints"] >> keyPts;
 		}
 	}
 	setText(0,name);
@@ -2259,11 +2259,18 @@ mlContainer::mlContainer(QTreeWidget* parent, mlType type_):
 	processingContainer(parent)
 {
 	MLType = type_;
+	initialize();
 }
 mlContainer::mlContainer(QTreeWidgetItem* parent, mlType type_) :
 	processingContainer(parent)
 {
 	MLType = type_;
+	initialize();
+}
+mlContainer::mlContainer(mlType type_)
+{
+	MLType = type_;
+	initialize();
 }
 mlContainer::~mlContainer()
 {
@@ -2273,9 +2280,11 @@ void
 mlContainer::initialize()
 {
 	type = ML;
-	if (MLType == SVM)
+	if (MLType == SVM_radialBasisKernel)
 	{
-
+		name = "Support Vector Machine: Radial Basis Kernel";
+		parameters.resize();
+		
 	}
 }
 void	

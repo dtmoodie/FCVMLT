@@ -19,7 +19,7 @@
 #include <imgsourceswidget.h>
 #include <imgstatswidget.h>
 #include <matview.h>
-#include <mlwidget.h>
+#include <mldialog.h>
 #include "savestreamdialog.h"
 //#include "cqtopencvviewergl.h"
 #include "registrationdialog.h"
@@ -72,6 +72,7 @@ private slots:
     void on_actionExtract_Stats_for_all_images_triggered();
 
     void on_actionSave_Camera_Stream_triggered();
+	void on_action_mlDialog_toggled();
 	void loadLabels(QString file);
 
 	void handleLinkViews(bool val);
@@ -98,7 +99,7 @@ private:
     imageEdit*				sourceImg;
     imageEdit*				filteredImg;
 	//CQtOpenCVViewerGl*			filteredImg;
-    mlWidget*				machineLearning;
+    mlDialog*				machineLearning;
 	compoundImgFunction*	compoundFilterWidget;
 	
 	QDockWidget*		compoundDock;
@@ -123,6 +124,7 @@ private:
 	// Drawing stuff
 	drawToolWidget*		drawWidget;
 	QDialog*			drawDialog;
+
 };
 
 #endif // MAINWINDOW_H

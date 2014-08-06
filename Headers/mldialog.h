@@ -6,6 +6,7 @@
 #include <FCVMLT.h>
 #include <QPlainTextEdit>
 #include <QGridLayout>
+#include <qcheckbox.h>
 #include "imgsourceswidget.h"
 namespace Ui {
 class mlDialog;
@@ -26,6 +27,12 @@ public:
     ~mlDialog();
 
 public slots:
+	// Finds relavent features and populates the featureSelection widget
+	void updateFeatureSelection();
+	void on_next_clicked();
+	void on_back_clicked();
+	void on_cancel_clicked();
+	void updateSettingPage();
 	
 
 signals :
@@ -33,9 +40,11 @@ signals :
 
 
 private:
-    Ui::mlDialog *ui;
-	imgSourcesWidget* sources;
-
+    Ui::mlDialog*		ui;
+	imgSourcesWidget*	sources;
+	QList<mlPtr>		algorithms;
+	QList<QCheckBox*>	algorithmSelectBoxes;
+	QList<QWidget*>		currentControlWidgets;
 };
 
 #endif // MLDIALOG_H

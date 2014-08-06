@@ -130,7 +130,7 @@ enum statType
 };
 enum mlType
 {
-	SVM
+	SVM_radialBasisKernel
 };
 struct param
 {
@@ -168,6 +168,7 @@ static const QList<compoundFilterType> COMPOUND_FILTER_TYPES(QList<compoundFilte
 				<<add<<subtract<<align);
 static const QList<statType> STAT_TYPES(QList<statType>()
 				<<sum<<avg<<copy<<median<<stdev<<hist<<sift<<HoG<<orb<<surf<<circle<<line<<lineP);
+static const QList<mlType> MACHINE_LEARNING_ALGORITHMS(QList<mlType>() << SVM_radialBasisKernel);
 // Defines how a specific color will scale with values
 struct colorScale
 {
@@ -363,6 +364,8 @@ class mlContainer : public processingContainer
 public:
 	explicit	mlContainer(QTreeWidget* parent = 0, mlType type_ = SVM);
 	explicit	mlContainer(QTreeWidgetItem* parent, mlType type_ = SVM);
+	explicit	mlContainer(mlType type_);
+
 				~mlContainer();
 	void		initialize();
 	void		train(cv::Mat features, cv::Mat labels);
