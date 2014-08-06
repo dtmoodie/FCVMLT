@@ -161,44 +161,58 @@ struct param
 
 	
 };
-enum colorMap
-{
-	custom = 0
-};
-/*
-// Applies a custom colormapping to an image. Incomplete
-static cv::Mat applyColorMap(cv::InputArray input, colorMap map, double max, double min)
-{
-	cv::Mat M = input.getMat();
-	double range = max - min;
 
-	if (M.type() == CV_32F)
-	{
-		// Since this is continuous data, need to calculate a value for each pixel.  This may just be too expensive to actually use
-	}
-	if (M.type() == CV_8U)
-	{
-
-	}
-	if (M.type() == CV_16U)
-	{
-		// Specifically for 16bit dicom images
-		std::vector<cv::Vec3b> LUT;
-		LUT.reserve(USHRT_MAX);
-		uchar selector = 0;
-		//for (int i = 0; i < )
-	}
-
-	return M;
-}
-*/
 static const QList<statMethod> STAT_METHODS(QList<statMethod>()
 				<<wholeImage<<ROI<<superPixel<<perPixel<<keyPoint<<mask);
 static const QList<compoundFilterType> COMPOUND_FILTER_TYPES(QList<compoundFilterType>()
 				<<add<<subtract<<align);
 static const QList<statType> STAT_TYPES(QList<statType>()
 				<<sum<<avg<<copy<<median<<stdev<<hist<<sift<<HoG<<orb<<surf<<circle<<line<<lineP);
-
+// Defines how a specific color will scale with values
+struct colorScale
+{
+	colorScale(double start_ = 0, double slope_ = 1, bool symmetric_ = false)
+	{
+		start = start_;
+		slope = slope_;
+		symmetric = symmetric_;
+		flipped = false;
+		inverted = false;
+	}
+	// Defines where this color starts to take effect, between zero and 1000
+	double start;
+	// Defines the slope of increase / decrease for this color between 1 and 255
+	double slope;
+	// Defines if the slope decreases after it peaks
+	bool	symmetric;
+	// Defines if this color starts high then goes low
+	bool	inverted;
+	uchar operator ()(double location)
+	{
+		return getValue(location);
+	}
+	uchar getValue(double location_)
+	{
+		double value = 0;
+		if (location_ > start)
+		{
+			value = (location_ - start)*slope;
+		}
+		else
+		{
+			value = 0;
+		}
+		if (value > 255)
+		{
+			if (symmetric) value = 512 - value;
+			else value = 255;
+		}
+		if (value < 0) value = 0;
+		if (inverted) value = 255 - value;
+		return (uchar)value;
+	}
+	bool flipped;
+};
 class container: public QTreeWidgetItem
 {
 public:
@@ -281,12 +295,16 @@ class featureContainer : public matrixContainer
 public:
 	featureContainer(QTreeWidget* parent = 0);
 	featureContainer(QTreeWidgetItem* parent);
+	featureContainer(QString absFilePath, QString parentName, QTreeWidgetItem* parent);
 	~featureContainer();
 	bool save();
+	bool load();
+	cv::Mat& lbl();
 	std::vector<cv::Point2f> keyPts;
 	cv::Mat	label;
 	double maxVal;
 	double minVal;
+
 };
 // *********************** processingContainer **********************
 class processingContainer : public QObject, public matrixContainer

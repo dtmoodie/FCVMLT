@@ -6,7 +6,10 @@ matView::matView(QWidget *parent, cv::Mat matrix, int rows_, int cols_) :
     QWidget(parent),
     cols(cols_),
     rows(rows_),
-	ui(new Ui::matView())
+	ui(new Ui::matView()),
+	RED(50, 255 / 25, true),
+	GREEN(25 / 3, 255 / 25, true),
+	BLUE(0, 255 / 25, true)
 {
 	offsetX = 0;
 	offsetY = 0;
@@ -50,15 +53,17 @@ matView::matView(QWidget *parent, cv::Mat matrix, int rows_, int cols_) :
 	ui->slicingButton->setCheckable(true);
 	ui->histButton->setCheckable(true);
 	ui->plotButton->setCheckable(true);
-	connect(ui->histButton, SIGNAL(clicked(bool)), this, SLOT(onHistClicked(bool)));
+	
+
 	connect(ui->slicingButton, SIGNAL(clicked(bool)), this, SLOT(onSliceClicked(bool)));
 	connect(ui->plotButton, SIGNAL(clicked(bool)), this, SLOT(onGraphClicked(bool)));
+
+	connect(ui->histButton, SIGNAL(clicked(bool)), this, SLOT(onHistClicked(bool)));
+	connect(ui->lineButton, SIGNAL(clicked(bool)), this, SLOT(onLineClicked(bool)));
+
 	connect(ui->horizontalSlider, SIGNAL(sliderMoved(int)), this, SLOT(changeX(int)));
 	connect(ui->verticalSlider, SIGNAL(sliderMoved(int)), this, SLOT(changeY(int)));
-
-	penColors.push_back(QColor(0, 0, 255));
-	penColors.push_back(QColor(0, 255, 0));
-	penColors.push_back(QColor(255, 0, 0));
+	
 	ui->plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
 	connect(ui->plot->xAxis, SIGNAL(rangeChanged(QCPRange)), ui->plot->xAxis2, SLOT(setRange(QCPRange)));
 	connect(ui->plot->yAxis, SIGNAL(rangeChanged(QCPRange)), ui->plot->yAxis2, SLOT(setRange(QCPRange)));
@@ -157,6 +162,7 @@ void
 matView::updateSlice()
 {
 	// Triggered after a slice parameter is updated
+	if (m.empty()) return;
 	ROI = m(cv::Range(ui->minRowSlice->value(), ui->maxRowSlice->value()), 
 			cv::Range(ui->minColSlice->value(), ui->maxColSlice->value()));
 	updateDisplay(offsetX, offsetY);
@@ -170,6 +176,13 @@ matView::updatePlot()
 		std::vector<cv::Mat> planes;
 		cv::split(ROI, planes);
 		ui->plot->clearGraphs();
+		penColors.resize(ROI.channels());
+		double location = 0;
+		double step = 100 / (double)penColors.size();
+		for (int i = 0; i < penColors.size(); ++i, location += step)
+		{
+			penColors[i] = QColor(RED(location), GREEN(location), BLUE(location));
+		}
 		int count = 0;
 		float maxVal = 0;
 		for (int i = 0; i < ROI.channels(); ++i)
@@ -211,21 +224,88 @@ matView::updatePlot()
 				ui->plot->yAxis->setLabel("Count");
 				ui->plot->xAxis->setRange(ui->param1->value(), ui->param2->value());
 				ui->plot->yAxis->setRange(0, maxVal);
-				ui->plot->replot();
 				++count;
 			}		
 		}
+		ui->plot->replot();
 		return;
 	}
 	if (b_scatterPlot)
 	{
 		// Create a scatter plot of all data in ROI
+		
 		return;
 	}
 	if (b_linePlot)
 	{
 		// Create a profile of roi accross a row or column
+		QVector<QVector<double>> x, y;
+		QString xAxis;
+		QString yAxis = "Value";;
+		if (ui->param1->value() == 0)
+		{
+			// Plot for each row of this ROI
+			xAxis = "Row index";
+			
+			x.resize(std::min(ROI.cols,10));
+			y.resize(std::min(ROI.cols,10));
+			for (int i = 0; i < ROI.cols && i < 10 /*Hard coded max number of plots*/; ++i)
+			{
+				x[i].resize(ROI.rows);
+				y[i].resize(ROI.rows);
+				for (int j = 0; j < ROI.rows; ++j)
+				{
+					float val;
+					if (ROI.type() == CV_32F)
+					{
+						val = ROI.at<float>(j, i);
+					}else
+					{
+						if (ROI.type() == CV_8U)
+						{
+							val = (float)ROI.at<uchar>(j, i);
+						}else
+						{
+							if (ROI.type() == CV_8U)
+							{
+								val = (float)ROI.at<cv::Vec3b>(j, i)[ui->minChanSlice->value()];
+							}
+						}
+					}
+					y[i][j] = val;
+					x[i][j] = j;
+				}
+			}
+			
+		}
+		else
+		{
+			if (ui->param1->value() == 1)
+			{
+				// Plot each column of this ROI
 
+			}
+			else
+			{
+				if (ui->param1->value() == 2)
+				{
+
+				}
+			}
+
+		}
+		ui->plot->clearGraphs();
+		double location = 0;
+		double step = 100 / (double)x.size();
+		for (int i = 0; i < x.size(); ++i, location += step)
+		{
+			ui->plot->addGraph();
+			ui->plot->graph(i)->setData(x[i], y[i]);
+			ui->plot->graph(i)->setPen(QPen(QColor(RED(location), GREEN(location), BLUE(location))));
+			ui->plot->xAxis->setLabel(xAxis);
+			ui->plot->yAxis->setLabel(yAxis);
+		}
+		ui->plot->replot();
 		return;
 	}
 }
@@ -335,8 +415,7 @@ matView::onScatterClicked(bool val)
 	b_scatterPlot = val;
 	if (val)
 	{
-		ui->histButton->setChecked(false);
-		ui->lineButton->setChecked(false);
+
 		
 	}else
 	{
@@ -353,7 +432,15 @@ matView::onLineClicked(bool val)
 	{
 		ui->scatterButton->setChecked(false);
 		ui->histButton->setChecked(false);
-
+		ui->histButton->setChecked(false);
+		ui->lineButton->setChecked(false);
+		ui->paramLbl1->setText("Select dimension");
+		ui->paramLbl2->setText("Set step");
+		ui->paramLbl1->show();
+		ui->paramLbl2->show();
+		ui->param1->show();
+		ui->param2->show();
+		updatePlot();
 	}else
 	{
 

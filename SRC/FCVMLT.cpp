@@ -1106,12 +1106,22 @@ imgContainer::loadChild(QString dirName_, QString absFileName_)
 	{
 		containerPtr child(new labelContainer(absFileName_, baseName, this));
 		childContainers.push_back(child);
+		return true;
 	}else
 	{
-		containerPtr tmp(new imgContainer(absFileName_, this));
-		childContainers.push_back(tmp);
+		if (absFileName_.endsWith(".xml", Qt::CaseInsensitive))
+		{
+			containerPtr tmp(new featureContainer(absFileName_,baseName, this));
+			childContainers.push_back(tmp);
+			return true;
+		}else
+		{
+			containerPtr tmp(new imgContainer(absFileName_, this));
+			childContainers.push_back(tmp);
+			return true;
+		}		
 	}
-	return true;
+	return false;
 }
 // ************************************************ streamContainer ***************************************
 streamContainer::streamContainer(QTreeWidget *parent):
@@ -1298,9 +1308,40 @@ featureContainer::featureContainer(QTreeWidgetItem* parent) :
 {
 	type = Features;
 }
+featureContainer::featureContainer(QString absFilePath, QString parentName, QTreeWidgetItem* parent)
+{
+	baseName = parentName;
+	QFileInfo file(absFilePath);
+	filePath = absFilePath;
+	type = Features;
+	isTop = false;
+	if (file.exists())
+	{
+		cv::FileStorage fs(file.absoluteFilePath().toStdString(), cv::FileStorage::READ);
+		std::string ty = (std::string)fs["type"];
+		if (ty == "FeatureContainer")
+		{
+			name = QString::fromStdString((std::string)fs["name"]);
+			//cv::FileNode pts = fs["keyPoints"];
+			// TODO fix keypoint loading with opencv 3.0
+			fs["keyPoints"] >> keyPts;
+		}
+	}
+	setText(0,name);
+	parent->addChild(this);
+}
 featureContainer::~featureContainer()
 {
 
+}
+cv::Mat&
+featureContainer::lbl()
+{
+	if (!label.empty()) return label;
+	if (filePath.size() == 0) return cv::Mat();
+	cv::FileStorage fs(filePath.toStdString(), cv::FileStorage::READ);
+	fs["label"] >> label;
+	return label;
 }
 bool
 featureContainer::save()
@@ -1313,11 +1354,21 @@ featureContainer::save()
 	QString saveName = dirName + "/Features/" + baseName + "_" + text(0) + ".xml";
 	cv::FileStorage fs;
 	fs.open(saveName.toStdString(), cv::FileStorage::WRITE);
+	fs << "type" << "FeatureContainer";
 	fs << "name" << name.toStdString();
 	fs << "matrix" << _M;
 	fs << "KeyPoints" << keyPts;
 	fs << "label" << label;
 	return true;
+}
+bool
+featureContainer::load()
+{
+	if (!_M.empty()) return true;
+	if (filePath.size() == 0) return false;
+	cv::FileStorage fs(filePath.toStdString(), cv::FileStorage::READ);
+	fs["matrix"] >> _M;
+	return !_M.empty();
 }
 // *********************** filterContainer **************************
 filterContainer::filterContainer(QTreeWidget* parent, filterType type_):
@@ -2235,17 +2286,17 @@ mlContainer::train(cv::Mat features, cv::Mat labels)
 float	
 mlContainer::test(cv::Mat features, cv::Mat labels)
 {
-
+	return 0;
 }
 bool	
 mlContainer::save()
 {
-
+	return true;
 }
 bool	
 mlContainer::load()
 {
-
+	return true;
 }
 
 // ******************************************************** filterMacro ****************************************************************

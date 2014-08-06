@@ -8,7 +8,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <QSpinBox>
 #include <QGridLayout>
-
+#include <FCVMLT.h>
 namespace Ui {
 class matView;
 }
@@ -50,6 +50,9 @@ private:
 	bool b_scatterPlot;
 	bool b_linePlot;
 	std::vector<QColor> penColors;
+	colorScale RED;// (50, 255 / 25, true);
+	colorScale GREEN;// (25 / 3, 255 / 25, true);
+	colorScale BLUE;// (0, 255 / 25, true);
 
 };
 

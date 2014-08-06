@@ -36,50 +36,7 @@
 namespace Ui {
     class imageEdit;
 }
-// Defines how a specific color will scale with values
-struct colorScale
-{
-	colorScale(double start_ = 0, double slope_ = 1, bool symmetric_ = false)
-	{
-		start = start_;
-		slope = slope_;
-		symmetric = symmetric_;
-		flipped = false;
-		inverted = false;
-	}
-	// Defines where this color starts to take effect, between zero and 1000
-	double start;
-	// Defines the slope of increase / decrease for this color between 1 and 255
-	double slope;
-	// Defines if the slope decreases after it peaks
-	bool	symmetric;
-	// Defines if this color starts high then goes low
-	bool	inverted;
-	uchar operator ()(double location)
-	{
-		return getValue(location);
-	}
-	uchar getValue(double location_)
-	{
-		double value = 0;
-		if (location_ > start)
-		{
-			value = (location_ - start)*slope;
-		}else
-		{
-			value = 0;
-		}
-		if (value > 255)
-		{
-			if (symmetric) value = 512 - value;
-			else value = 255;
-		}
-		if (value < 0) value = 0;
-		if (inverted) value = 255 - value;
-		return (uchar)value;
-	}
-	bool flipped;
-};
+
 #ifdef OPENGL
 class GLimageEdit : public QGLWidget
 {
