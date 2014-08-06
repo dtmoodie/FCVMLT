@@ -53,6 +53,10 @@ private:
 	colorScale RED;// (50, 255 / 25, true);
 	colorScale GREEN;// (25 / 3, 255 / 25, true);
 	colorScale BLUE;// (0, 255 / 25, true);
+	int prevMinRowSlice;
+	int prevMaxRowSlice;
+	int prevMinColSlice;
+	int prevMaxColSlice;
 
 };
 

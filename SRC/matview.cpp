@@ -11,6 +11,9 @@ matView::matView(QWidget *parent, cv::Mat matrix, int rows_, int cols_) :
 	GREEN(25 / 3, 255 / 25, true),
 	BLUE(0, 255 / 25, true)
 {
+	b_histPlot = false;
+	b_linePlot = false;
+	b_scatterPlot = false;
 	offsetX = 0;
 	offsetY = 0;
 	ui->setupUi(this);
@@ -63,10 +66,17 @@ matView::matView(QWidget *parent, cv::Mat matrix, int rows_, int cols_) :
 
 	connect(ui->horizontalSlider, SIGNAL(sliderMoved(int)), this, SLOT(changeX(int)));
 	connect(ui->verticalSlider, SIGNAL(sliderMoved(int)), this, SLOT(changeY(int)));
+
+	connect(ui->minColSlice, SIGNAL(editingFinished()), this, SLOT(updateSlice()));
+	connect(ui->maxColSlice, SIGNAL(editingFinished()), this, SLOT(updateSlice()));
+	connect(ui->minRowSlice, SIGNAL(editingFinished()), this, SLOT(updateSlice()));
+	connect(ui->maxRowSlice, SIGNAL(editingFinished()), this, SLOT(updateSlice()));
+
 	
 	ui->plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom | QCP::iSelectPlottables);
 	connect(ui->plot->xAxis, SIGNAL(rangeChanged(QCPRange)), ui->plot->xAxis2, SLOT(setRange(QCPRange)));
 	connect(ui->plot->yAxis, SIGNAL(rangeChanged(QCPRange)), ui->plot->yAxis2, SLOT(setRange(QCPRange)));
+
 
 }
 matView::~matView()
@@ -97,19 +107,24 @@ matView::changeMat(cv::Mat M_)
 		ui->minChanSlice->setValue(0);
 		ui->maxChanSlice->setValue(M_.channels());
 		ui->maxChanSlice->setValue(1);
+		prevMinRowSlice = 0;
+		prevMaxRowSlice = M_.rows-1;
+		prevMinColSlice = 0;
+		prevMaxColSlice = M_.cols-1;
 	}
+	updateLabel();
 	m = M_;
 	updateSlice();
-	updatePlot();
+	//updatePlot();
 }
 void
 matView::updateLabel()
 {
 	double minVal, maxVal;
 	cv::minMaxIdx(ROI, &minVal, &maxVal);
-	ui->rowLbl->setText("Rows: " + QString::number(m.rows));
-	ui->colLbl->setText("Cols: " + QString::number(m.cols));
-	ui->chLbl->setText("Channels: " + QString::number(m.channels()));
+	ui->rowLbl->setText("Rows: " + QString::number(ROI.rows));
+	ui->colLbl->setText("Cols: " + QString::number(ROI.cols));
+	ui->chLbl->setText("Channels: " + QString::number(ROI.channels()));
 	ui->maxLbl->setText("Max Val: " + QString::number(maxVal));
 	ui->minLbl->setText("Min Val: " + QString::number(minVal));
 	ui->horizontalSlider->setMaximum(ROI.cols);
@@ -163,9 +178,19 @@ matView::updateSlice()
 {
 	// Triggered after a slice parameter is updated
 	if (m.empty()) return;
+	// If the values are all the same as last time, skip this.  Prevents accessive updates due to editingFinished 
+	// accidentally firing too often
+	if (prevMinRowSlice == ui->minRowSlice->value() && prevMaxRowSlice == ui->maxRowSlice->value() &&
+		prevMinColSlice == ui->minColSlice->value() && prevMaxColSlice == ui->maxColSlice->value()) return;
+	prevMinRowSlice = ui->minRowSlice->value();
+	prevMaxRowSlice = ui->maxRowSlice->value();
+	prevMinColSlice = ui->minColSlice->value();
+	prevMaxColSlice = ui->maxColSlice->value();
 	ROI = m(cv::Range(ui->minRowSlice->value(), ui->maxRowSlice->value()), 
 			cv::Range(ui->minColSlice->value(), ui->maxColSlice->value()));
 	updateDisplay(offsetX, offsetY);
+	updateLabel();
+	updatePlot();
 }
 void
 matView::updatePlot()
@@ -266,7 +291,7 @@ matView::updatePlot()
 							val = (float)ROI.at<uchar>(j, i);
 						}else
 						{
-							if (ROI.type() == CV_8U)
+							if (ROI.type() == CV_8UC3)
 							{
 								val = (float)ROI.at<cv::Vec3b>(j, i)[ui->minChanSlice->value()];
 							}
