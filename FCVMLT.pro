@@ -28,7 +28,10 @@ SOURCES += SRC/main.cpp\
     SRC/compoundimgfunction.cpp \
     SRC/qtcontainer.cpp \
     SRC/savestreamdialog.cpp \
-    SRC/registrationdialog.cpp
+    SRC/registrationdialog.cpp \
+    SRC/drawtoolwidget.cpp \
+    matview.cpp
+
 HEADERS  += headers/mainwindow.h \
     headers/container.h \
     headers/filterwidget.h \
@@ -44,7 +47,9 @@ HEADERS  += headers/mainwindow.h \
     headers/compoundimgfunction.h \
     headers/qtcontainer.h \
     headers/savestreamdialog.h \
-    headers/registrationdialog.h
+    headers/registrationdialog.h \
+    headers/drawtoolwidget.h \
+    matview.h
 
 FORMS    += UIs/mainwindow.ui \
     UIs/filterwidget.ui \
@@ -57,7 +62,9 @@ FORMS    += UIs/mainwindow.ui \
     UIs/mlwidget.ui \
     UIs/compoundimgfunction.ui \
     UIs/savestreamdialog.ui \
-    UIs/registrationdialog.ui
+    UIs/registrationdialog.ui \
+    UIs/drawtoolwidget.ui \
+    matview.ui
 
 
 INCLUDEPATH += C:/Opencv248/build/include

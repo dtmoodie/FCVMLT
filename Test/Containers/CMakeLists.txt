@@ -29,10 +29,6 @@ QT5_WRAP_CPP(MOC
 	${sources} 	
 	${headers}
 )
-#printfiles(${sources})
-#printfiles(${headers})
-#printfiles(${forms})
-#printfiles(${test})
 source_group("Forms" 		FILES ${forms})
 source_group("UI Headers" 	FILES ${UIS})
 source_group("MOC'd files" 	FILES ${MOC})

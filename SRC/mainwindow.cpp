@@ -34,27 +34,14 @@ MainWindow::MainWindow(QWidget *parent) :
     scrollZ(NULL),
     ui(new Ui::MainWindow),
 	logFile(NULL),
-	regDialog(NULL)
+	regDialog(NULL),
+	drawWidget(NULL),
+	drawDialog(NULL)
     //saveDialog(new saveStreamDialog(this))
 {
 
     layout = new QGridLayout(this);
-#ifndef KEITH_BUILD
-    // ******************************* Feature extraction **********************************
-    stats = new imgStatsWidget(this);
-    statDock = new QDockWidget(this);
-    statDock->setAllowedAreas(Qt::TopDockWidgetArea       |
-                                Qt::BottomDockWidgetArea    |
-                                Qt::LeftDockWidgetArea      |
-                                Qt::RightDockWidgetArea);
-    statDock->setFeatures(QDockWidget::DockWidgetClosable     |
-                            QDockWidget::DockWidgetFloatable    |
-                            QDockWidget::DockWidgetMovable);
-    statDock->setWidget(stats);
-    statDock->setWindowTitle("Image Stats");
-    addDockWidget(Qt::LeftDockWidgetArea, statDock);
-    statDock->hide();
-#endif
+
     // ******************************* Source selection ************************************
     sources = new imgSourcesWidget(this);
 #ifndef KEITH_BUILD
@@ -75,11 +62,12 @@ MainWindow::MainWindow(QWidget *parent) :
     sourceLbl->setText("Source Image");
     sourceLbl->setMaximumHeight(20);
     layout->addWidget(sourceLbl,0,0);
-
-    sourceImg = new imageEdit(this);
+	sourceDisplayThread = new QThread();
+	sourceDisplayThread->start();
+    sourceImg = new imageEdit(this, sources);
     sourceImg->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
     layout->addWidget(sourceImg,1,0);
-
+	sourceImg->moveToThread(sourceDisplayThread);
 
 	// ************************** Save stream dialog **************************************
 	saveDialog = new saveStreamDialog(this);
@@ -124,10 +112,13 @@ MainWindow::MainWindow(QWidget *parent) :
     filterLbl->setText("Filter Preview");
     filterLbl->setMaximumHeight(20);
     layout->addWidget(filterLbl,0,1);
-    filteredImg = new imageEdit(this);
+	filteredDisplayThread = new QThread;
+	filteredDisplayThread->start();
+	filteredImg = new imageEdit(this, sources);
 	//filteredImg = new CQtOpenCVViewerGl(this);
 	filteredImg->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding);
     layout->addWidget(filteredImg,1,1);
+	filteredImg->moveToThread(filteredDisplayThread);
 
 
     // ***************************** Text console *************************************
@@ -152,27 +143,47 @@ MainWindow::MainWindow(QWidget *parent) :
     addDockWidget(Qt::LeftDockWidgetArea,mlDock);
     mlDock->hide();
 
-
+#ifndef KEITH_BUILD
+	// ******************************* Feature extraction **********************************
+	stats = new imgStatsWidget(this, sources);
+	statDock = new QDockWidget(this);
+	statDock->setAllowedAreas(Qt::TopDockWidgetArea |
+		Qt::BottomDockWidgetArea |
+		Qt::LeftDockWidgetArea |
+		Qt::RightDockWidgetArea);
+	statDock->setFeatures(QDockWidget::DockWidgetClosable |
+		QDockWidget::DockWidgetFloatable |
+		QDockWidget::DockWidgetMovable);
+	statDock->setWidget(stats);
+	statDock->setWindowTitle("Image Stats");
+	addDockWidget(Qt::LeftDockWidgetArea, statDock);
+	statDock->hide();
+#endif
 	
 
     // ***************************** Signals and Slots **************************************
 
     //connect(sources, SIGNAL(sourceChange(cv::Mat)),     filter,     SLOT(receiveImgChange(cv::Mat)));
-    connect(sources, SIGNAL(sourceChange(container*)),  filter,     SLOT(handleImgChange(container*)));
-    connect(sources, SIGNAL(sourceChange(container*)),  this,       SLOT(handleSourceChange(container*)));
-    connect(sources, SIGNAL(sourceChange(container*)),  stats,      SLOT(handleImgChange(container*)));
+	//connect(sources, SIGNAL(sourceChange(container*)), filter, SLOT(handleImgChange(container*)), Qt::QueuedConnection);
+	connect(sources, SIGNAL(sourceChange(containerPtr)), filter, SLOT(handleImgChange(containerPtr)));
+	//connect(sources, SIGNAL(sourceChange(container*)), this, SLOT(handleSourceChange(container*)), Qt::QueuedConnection);
+	connect(sources, SIGNAL(sourceChange(containerPtr)), stats, SLOT(handleImgChange(containerPtr)));
 	connect(stats,	 SIGNAL(log(QString, int)),			this,		SLOT(handleLog(QString, int)));
 	connect(filter,  SIGNAL(log(QString, int)),			this,		SLOT(handleLog(QString, int)));
 #endif
     //connect(sources, SIGNAL(sourcePreview(cv::Mat)),    sourceImg,  SLOT(changeImg(cv::Mat)));
-	connect(sources, SIGNAL(sourcePreview(container*)), sourceImg, SLOT(changeImg(container*)));
+	//connect(sources, SIGNAL(sourcePreview(container*)), sourceImg, SLOT(changeImg(container*)));
+	connect(sources, SIGNAL(sourcePreview(containerPtr)), sourceImg, SLOT(changeImg(containerPtr)));
 	connect(sources, SIGNAL(sourceChange(container*)),	saveDialog, SLOT(handleNewImage(container*)));
+	connect(sources, SIGNAL(viewMatrix(cv::Mat)), this, SLOT(viewMatrix(cv::Mat)));
+
     //connect(sources, SIGNAL(sourcePreview(container*)), stats,      SLOT(handleImgChange(container*)));
 #ifndef KEITH_BUILD
 	connect(sources->sourceList, SIGNAL(itemSelectionChanged()),machineLearning, SLOT(handleSelectionChange()));
 
     // Triggered when the selected filtered image is changed, updates the display of that image
-    connect(filter, SIGNAL(filterImgChanged(cv::Mat)),  filteredImg,    SLOT(changeImg(cv::Mat)));
+	//connect(filter, SIGNAL(filterImgChanged(cv::Mat)), filteredImg, SLOT(changeImg(cv::Mat))); // , Qt::QueuedConnection);
+	connect(filter, SIGNAL(filterImgChanged(containerPtr)), filteredImg, SLOT(changeImg(containerPtr)));
 	connect(filter, SIGNAL(saveImage(cv::Mat, QString)), sources, SLOT(handleSaveImage(cv::Mat, QString)));
 	//connect(filter, SIGNAL(filterImgChanged(cv::Mat)), filteredImg, SLOT(showImage(cv::Mat)));
 
@@ -187,6 +198,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(stats, SIGNAL(extractedFeatures(cv::Mat, bool)), this,  SLOT(displayMat(cv::Mat, bool)));
     connect(stats, SIGNAL(saveFeatures(cv::Mat,QString)), sources,  SLOT(handleSaveFeatures(cv::Mat,QString)));
+	connect(stats, SIGNAL(viewFeatures(cv::Mat)), this, SLOT(viewMatrix(cv::Mat)));
+
+	// Drawing signals
+	connect(sourceImg, SIGNAL(drawPt(cv::Rect, cv::Mat)), filteredImg, SLOT(mirrorDraw(cv::Rect, cv::Mat)));
+	connect(sourceImg, SIGNAL(erasePt(cv::Rect)), filteredImg, SLOT(mirrorErase(cv::Rect)));
+	connect(filteredImg, SIGNAL(drawPt(cv::Rect, cv::Mat)), sourceImg, SLOT(mirrorDraw(cv::Rect, cv::Mat)));
+	connect(filteredImg, SIGNAL(erasePt(cv::Rect)), sourceImg, SLOT(mirrorErase(cv::Rect)));
 	
 #endif
 
@@ -203,6 +221,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->actionLink_Image_Views, SIGNAL(toggled(bool)), this, SLOT(handleLinkViews(bool)));
 	connect(ui->actionMerge_image_displays, SIGNAL(toggled(bool)), this, SLOT(on_actionMergeImageDisplays(bool)));
 	connect(ui->actionRegistration, SIGNAL(triggered()), this, SLOT(handleOpenRegistration()));
+	connect(ui->actionDraw_menu, SIGNAL(triggered()), this, SLOT(handleOpenDrawMenu()));
 	
 #endif
     ui->centralWidget->setLayout(layout);
@@ -212,6 +231,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+	delete filter;
+	delete sources;
     delete ui;
 }
 
@@ -237,8 +258,7 @@ void MainWindow::handleLinkViews(bool val)
 	{
 		connect(sourceImg, SIGNAL(newROI(cv::Rect)), filteredImg, SLOT(handleROIUpdate(cv::Rect)));
 		connect(filteredImg, SIGNAL(newROI(cv::Rect)), sourceImg, SLOT(handleROIUpdate(cv::Rect)));
-	}
-	else
+	}else
 	{
 		disconnect(sourceImg, SIGNAL(newROI(cv::Rect)), filteredImg, SLOT(handleROIUpdate(cv::Rect)));
 		disconnect(filteredImg, SIGNAL(newROI(cv::Rect)), sourceImg, SLOT(handleROIUpdate(cv::Rect)));
@@ -249,17 +269,41 @@ MainWindow::handleOpenRegistration()
 {
 	if (regDialog == NULL)
 	{
-		regDialog = new registrationDialog(this);
-		connect(sources, SIGNAL(sourcePreview(container*)), regDialog, SLOT(handleImageSelect(container*)));
+		regDialog = new registrationDialog(this, sources);
+		connect(sources, SIGNAL(sourcePreview(containerPtr)), regDialog, SLOT(handleImageSelect(containerPtr)));
 		connect(regDialog, SIGNAL(log(QString, int)), this, SLOT(handleLog(QString, int)));
 	}
 	regDialog->show();
+}
+void
+MainWindow::handleOpenDrawMenu()
+{
+	if (drawWidget == NULL)
+	{
+		if (drawDialog == NULL)
+		{
+			drawDialog = new QDialog(this);
+		}
+		drawWidget = new drawToolWidget(drawDialog);
+	}
+	connect(drawWidget, SIGNAL(drawToggled(bool)), sourceImg, SLOT(handleDrawToggled(bool)));
+	connect(drawWidget, SIGNAL(drawToggled(bool)), filteredImg, SLOT(handleDrawToggled(bool)));
+
+	connect(drawWidget, SIGNAL(eraseToggled(bool)), sourceImg, SLOT(handleEraseToggled(bool)));
+	connect(drawWidget, SIGNAL(eraseToggled(bool)), filteredImg, SLOT(handleEraseToggled(bool)));
+
+	connect(drawWidget, SIGNAL(sizeChanged(int)), sourceImg, SLOT(handleSizeChanged(int)));
+	connect(drawWidget, SIGNAL(sizeChanged(int)), filteredImg, SLOT(handleSizeChanged(int)));
+
+	connect(drawWidget, SIGNAL(save()), sourceImg, SLOT(handleSaveDrawing()));
+	connect(drawWidget, SIGNAL(save()), filteredImg, SLOT(handleSaveDrawing()));
+	drawDialog->show();
 }
 
 void MainWindow::on_actionFiles_from_disk_triggered()
 {
 	
-    QStringList files = QFileDialog::getOpenFileNames(this,"Select files","E:/Data/Images/Castrol MB 50/Castrol MB 50, 10.00m","Images (*.png *.jpg *.tiff *dcm)");
+    QStringList files = QFileDialog::getOpenFileNames(this,"Select files","C:/Data/Images/Castrol MB 50/Castrol MB 50, 10.00m","Images (*.png *.jpg *.tiff *dcm)");
 	boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
 	if(files.size() == 0) return;
     QFileInfo lblCheck(files[0]);
@@ -288,12 +332,13 @@ void MainWindow::on_actionFiles_from_disk_triggered()
     }
 	for (int i = 0; i < files.size(); ++i)
 	{
-		imgContainer* tmp = new imgContainer(files.at(i), sources->sourceList);
+		imgPtr tmp( new imgContainer(files.at(i), sources->sourceList) );
 		// Load all sub information
 		for (int j = 0; j < dirs.size(); ++j)
 		{
 			tmp->loadChildFromDir(dirs[j]);
 		}
+		sources->sources.push_back(tmp);
 	}
 	boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
 	boost::posix_time::time_duration delta = end - start;
@@ -437,6 +482,10 @@ void MainWindow::handleSourceChange(container* cont)
 void 
 MainWindow::handleLog(QString line, int level)
 {
+	if (sender() == (QObject*)stats)
+	{
+		line = "[STATS] " + line;
+	}
 	if (level < VERBOSITY_LEVEL) return;
 	if (logFile == NULL) logFile = new QFile(LOG_NAME);
 	if (!logFile->isOpen()) logFile->open(QIODevice::Append | QIODevice::Text);
@@ -494,38 +543,50 @@ MainWindow::on_actionApply_filters_to_all_iamges_triggered()
 
 void MainWindow::viewMatrix(cv::Mat img)
 {
-    if(matViewer != NULL) delete matViewer;
-    if(matViewerDlg != NULL) delete matViewerDlg;
+	if (matViewer != NULL && matViewerDlg != NULL)
+	{
+		matViewer->changeMat(img);
+		matViewerDlg->show();
+		return;
+	}
     matViewerDlg = new QDialog(this);
     matViewer = new matView(this,img);
+	QGridLayout* layout = new QGridLayout(matViewerDlg);
+	matViewerDlg->setLayout(layout);
+	layout->addWidget(matViewer);
+	matViewerDlg->show();
+	/*
     QGridLayout* matLayout = new QGridLayout(this);
 
     // ToDo: Add buttons to allow scrolling of the matrix
     scrollX = new QSpinBox(matViewerDlg);
     scrollY = new QSpinBox(matViewerDlg);
-    scrollZ = new QSpinBox(matViewerDlg);
+	scrollX->setMaximum(img.cols - 1);
+	scrollY->setMaximum(img.rows - 1);
+	QLabel* colLbl = new QLabel(matViewerDlg);
+	colLbl->setText("Columns: " + QString::number(img.cols));
+	QLabel* rowLbl = new QLabel(matViewerDlg);
+	rowLbl->setText("Rows: " + QString::number(img.rows));
+	QLabel* chLbl = new QLabel(matViewerDlg);
+	chLbl->setText("Channels: " + QString::number(img.channels()));
     connect(scrollX, SIGNAL(valueChanged(int)), matViewer, SLOT(changeX(int)));
     connect(scrollY, SIGNAL(valueChanged(int)), matViewer, SLOT(changeY(int)));
-    connect(scrollZ, SIGNAL(valueChanged(int)), matViewer, SLOT(changeZ(int)));
     matLayout->addWidget(matViewer,0,1,4,1);
     matLayout->addWidget(scrollX,0,0);
     matLayout->addWidget(scrollY,1,0);
-    matLayout->addWidget(scrollZ,2,0);
+	matLayout->addWidget(colLbl, 2, 0);
+	matLayout->addWidget(rowLbl, 3, 0);
+	matLayout->addWidget(chLbl, 4, 0);
     matViewerDlg->setLayout(matLayout);
     matViewerDlg->show();
-    matViewerDlg->setWindowTitle("Matrix Viewer");
+	matViewerDlg->setWindowTitle("Matrix Viewer");*/
 }
 
 void MainWindow::on_actionExtract_Stats_for_all_images_triggered()
 {
-    for(int i = 0; i < sources->sourceList->topLevelItemCount(); ++i)
+	for (int i = 0; i < sources->sources.size(); ++i)
     {
-        container* cont = dynamic_cast<container*>(sources->sourceList->topLevelItem(i));
-		if (!cont->isData) return;
-		imgContainer* tmp = dynamic_cast<imgContainer*>(cont);
-		//if (tmp->M().empty()) tmp->M() = cv::imread(tmp->filePath.toStdString());
-		stats->handleImgChange(tmp);
-		tmp->_M.release();
+		stats->handleImgChange(sources->sources[i]);
     }
 }
 

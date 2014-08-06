@@ -43,6 +43,7 @@
     <addaction name="actionUse_colormap"/>
     <addaction name="actionMerge_image_displays"/>
     <addaction name="actionRegistration"/>
+    <addaction name="actionDraw_menu"/>
    </widget>
    <widget class="QMenu" name="menuBatch">
     <property name="title">
@@ -141,6 +142,11 @@
   <action name="actionRegistration">
    <property name="text">
     <string>Registration</string>
+   </property>
+  </action>
+  <action name="actionDraw_menu">
+   <property name="text">
+    <string>Draw menu</string>
    </property>
   </action>
  </widget>

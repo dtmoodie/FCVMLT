@@ -8,7 +8,6 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <FCVMLT.h>
-//#include <imgFilter.h>
 
 
 

@@ -24,14 +24,54 @@ imgSourcesWidget::imgSourcesWidget(QWidget *parent) :
     connect(sourceList, SIGNAL(itemActivated(QTreeWidgetItem*,int)),
             this, SLOT(handleItemActivated(QTreeWidgetItem*,int)));
     sourceList->installEventFilter(this);
-	_sourceAction = new QAction("Save image", this);
-	connect(_sourceAction, SIGNAL(triggered()), this, SLOT(handleSaveAction()));
-	sourceList->addAction(_sourceAction);
+	_sourceSaveAction = new QAction("Save image", this);
+	_matrixViewAction = new QAction("View Matrix", this);
+	connect(_sourceSaveAction, SIGNAL(triggered()), this, SLOT(handleSaveAction()));
+	connect(_matrixViewAction, SIGNAL(triggered()), this, SLOT(handleViewMatrix()));
+	sourceList->addAction(_sourceSaveAction);
+	sourceList->addAction(_matrixViewAction);
 	sourceList->setContextMenuPolicy(Qt::ActionsContextMenu);
+	sourceList->setDragEnabled(true);
+	sourceList->setDragDropMode(QAbstractItemView::DragDropMode::DragOnly);
 }
 imgSourcesWidget::~imgSourcesWidget()
 {
+	sources.clear();
     delete ui;
+}
+containerPtr 
+imgSourcesWidget::getContainer(QString name)
+{
+	for (int i = 0; i < sources.size(); ++i)
+	{
+		if (name == sources[i]->baseName)
+		{
+			return sources[i];
+		}
+		containerPtr child = sources[i]->getChild(name);
+		if (child != NULL)
+		{
+			return child;
+		}
+	}
+	return containerPtr();
+}
+containerPtr
+imgSourcesWidget::getContainer(container* ptr)
+{
+	for (int i = 0; i < sources.size(); ++i)
+	{
+		if (ptr == sources[i].get())
+		{
+			return sources[i];
+		}
+		containerPtr child = sources[i]->getChild(ptr);
+		if (child != NULL)
+		{
+			return child;
+		}
+	}
+	return containerPtr();
 }
 void 
 imgSourcesWidget::handleItemChange(QTreeWidgetItem *current, QTreeWidgetItem *previous)
@@ -39,34 +79,51 @@ imgSourcesWidget::handleItemChange(QTreeWidgetItem *current, QTreeWidgetItem *pr
     if(previous != NULL)
     {
 		container* prev = dynamic_cast<container*>(previous);
-		switch (prev->type)
+		if (prev != NULL)
 		{
+			switch (prev->type)
+			{
 			case container::Img:
 				imgContainer* tmp = dynamic_cast<imgContainer*>(prev);
 				//if (!tmp->M.empty() && tmp->isTop)
-					//tmp->M.release();
+				//tmp->M.release();
 				break;
+			}
 		}
     }
     container* cur = dynamic_cast<container*>(current);
 	curCont = cur;
     if(cur == NULL) return;
-	switch (cur->type)
+	// Perform a recursive search of the source tree to find the shared pointer to this container
+	containerPtr tmp;
+	for (int i = 0; i < sources.size(); ++i)
 	{
-	case container::Img:
+		if (cur == sources[i].get())
+		{
+			tmp = sources[i];
+			break;
+		}
+		tmp = sources[i]->getChild(cur);
+		if (tmp != NULL) break;
+	}
+	if (tmp == NULL)return;
+	switch (tmp->type)
 	{
-		imgContainer* tmp = dynamic_cast<imgContainer*>(cur);
-		emit sourcePreview(tmp->M());
-		break;
+		case container::Img:
+		{
+			emit sourcePreview(tmp);
+			break;
+		}
+		case container::Label:
+		{
+			emit sourcePreview(tmp);
+			break;
+		}
+		case container::Features:
+			emit sourcePreview(tmp);
+			break;
 	}
-	case container::Label:
-	{
-		labelContainer* tmp = dynamic_cast<labelContainer*>(cur);
-		emit sourcePreview(tmp->M());
-		break;
-	}
-	}
-    emit sourcePreview(cur);
+	
 }
 void 
 imgSourcesWidget::handleItemActivated(QTreeWidgetItem *item, int col)
@@ -82,9 +139,9 @@ imgSourcesWidget::handleItemActivated(QTreeWidgetItem *item, int col)
 			{
 				//if (tmp->M().empty() && tmp->filePath.size() > 0)
 				//	tmp->M() = cv::imread(tmp->filePath.toStdString());
-				if (tmp->M().empty()) return;
-				emit sourcePreview(tmp->M());
-				emit sourceChange(tmp->M());
+				//if (tmp->M().empty()) return;
+				//emit sourcePreview(tmp->M());
+				//emit sourceChange(tmp->M());
 			}
 			catch (cv::Exception &e)
 			{
@@ -97,7 +154,19 @@ imgSourcesWidget::handleItemActivated(QTreeWidgetItem *item, int col)
 		{
 		}
 	}
-    emit sourceChange(curCont);
+	containerPtr tmp;
+	for (int i = 0; i < sources.size(); ++i)
+	{
+		if (curCont == sources[i].get())
+		{
+			tmp = sources[i];
+			break;
+		}
+		tmp = sources[i]->getChild(curCont);
+		if (tmp != NULL) break;
+	}
+	if (tmp == NULL)return;
+	emit sourceChange(tmp);
 }
 void 
 imgSourcesWidget::handleSaveImage(cv::Mat img, QString name)
@@ -117,11 +186,24 @@ imgSourcesWidget::handleSaveAction()
 	if (cont->isTop) return; 
 	switch (cont->type)
 	{
-	case container::Img:
-		imgContainer* tmp = dynamic_cast<imgContainer*>(cont);
-		if (tmp->M().empty()) return;
-		tmp->save();
-		break;
+		case container::Img:
+		{
+			imgContainer* tmp = dynamic_cast<imgContainer*>(cont);
+			if (tmp->M().empty()) return;
+			tmp->save();
+			tmp->saved = true;
+			if (tmp->parentContainer != NULL)
+				tmp->parentContainer->saved = true;
+			break;
+		}
+		case container::Features:
+		{
+			featureContainer* tmp = dynamic_cast<featureContainer*>(cont);
+			tmp->save();
+			tmp->saved = true;
+			if (tmp->parentContainer != NULL)
+				tmp->parentContainer->saved = true;
+		}
 	}
 }
 void 
@@ -148,6 +230,15 @@ imgSourcesWidget::handleSaveFeatures(cv::Mat features, QString name)
     child->addChild(rows);
 
     sourceList->currentItem()->addChild(child);
+}
+void
+imgSourcesWidget::handleViewMatrix()
+{
+	if (curCont->type == container::Img || curCont->type == container::Label || curCont->type == container::Features)
+	{
+		matrixContainer* M =dynamic_cast<matrixContainer*>(curCont);
+		emit viewMatrix(M->M());
+	}
 }
 bool 
 imgSourcesWidget::eventFilter(QObject *obj, QEvent *ev)

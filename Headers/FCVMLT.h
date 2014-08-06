@@ -1,7 +1,6 @@
 #ifndef CONTAINER_H
 #define CONTAINER_H
 // Contains anything that can be selected from a widget, such as a filter or a source image
-
 #include <QObject>
 #include <QString>
 #include <QTreeWidgetItem>
@@ -13,14 +12,48 @@
 #include <qpushbutton.h>
 #include <qdir.h>
 #include "qfileinfo.h"
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 #include <opencv2/highgui/highgui.hpp>
+
 #include <boost/thread.hpp>
-//#include "imebra\include\imebra.h"
-#include "dicomLoader.h"
+#include <boost/shared_ptr.hpp>
+
+#ifdef DICOM_LOADER_FOUND
+#include "subprojects/dicomLoader/dicomLoader.h"
+#endif
+class container;
+class matrixContainer;
+class featureContainer;
+class processingContainer;
+class mlContainer;
+class imgContainer;
+class streamContainer;
+class labelContainer;
+class filterContainer;
+class compoundFilterContainer;
+class featureExtractorContainer;
+class featureWindowContainer;
+class statContainer;
+class filterMacro;
+
+typedef boost::shared_ptr<container> containerPtr;
+typedef boost::shared_ptr<matrixContainer> matrixPtr;
+typedef boost::shared_ptr<featureContainer> featurePtr;
+typedef boost::shared_ptr<processingContainer> processingPtr;
+typedef boost::shared_ptr<mlContainer> mlPtr;
+typedef boost::shared_ptr<imgContainer> imgPtr;
+typedef boost::shared_ptr<streamContainer> streamPtr;
+typedef boost::shared_ptr<labelContainer> labelPtr;
+typedef boost::shared_ptr<filterContainer> filterPtr;
+typedef boost::shared_ptr<compoundFilterContainer> compoundFilterPtr;
+typedef boost::shared_ptr<featureExtractorContainer> featureExtractorPtr;
+typedef boost::shared_ptr<featureWindowContainer> featureWindowPtr;
+typedef boost::shared_ptr<statContainer> statPtr;
+typedef boost::shared_ptr<filterMacro> macroPtr;
 
 enum filterType
 {
@@ -33,6 +66,7 @@ enum filterType
 	resize,
 	crop,
 	grey,
+	HSV,
 	HSV_hue,
 	HSV_sat,
 	HSV_val,
@@ -41,15 +75,18 @@ enum filterType
 	scharr,
 	canny,
 	gradientOrientation,
-	contourFilter
+	contourFilter,
+	nonMaxSuppress
 };
+
 static const QList<filterType> FILTER_TYPES(QList<filterType>()
-	<< threshold << erode << dilate << sobel << smooth << gabor << resize << crop << grey << HSV_hue << HSV_sat << HSV_val << laplacian << pyrMeanShift << scharr << canny << gradientOrientation << contourFilter);
+	<< threshold << erode << dilate << sobel << smooth << gabor << resize << crop << grey << HSV << HSV_hue << HSV_sat << HSV_val << laplacian << pyrMeanShift << scharr << canny << gradientOrientation << contourFilter << nonMaxSuppress);
+
 static const QStringList FILTER_NAMES(QStringList()
 	<< "Threshold" << "Erode" << "Dilate" << "Sobel" << "Smooth" << "Gabor Filter" 
-	<< "Resize" << "Crop" << "Convert to Grey" << "Convert to HSV hue"
+	<< "Resize" << "Crop" << "Convert to Grey" << "Single HSV plane extraction" << "Convert to HSV hue"
 	<< "Convert to HSV saturation" << "Convert to HSV value" << "Laplacian" 
-	<< "Pyramid Mean Shift" << "Sharr Filter" << "Canny Edge Detect" << "Gradient Orientation"  << "Contour Filter");
+	<< "Pyramid Mean Shift" << "Sharr Filter" << "Canny Edge Detect" << "Gradient Orientation"  << "Contour Filter" << "Non maximal suppression");
 enum compoundFilterType
 {
     add = 0,
@@ -72,12 +109,14 @@ enum statMethod
     ROI,
     superPixel,
     perPixel,
-    keyPoint
+    keyPoint,
+	mask
 };
 enum statType
 {
     sum = 0,
     avg,
+	copy,
     median,
     stdev,
     hist,
@@ -88,6 +127,10 @@ enum statType
 	circle,
 	line,
 	lineP
+};
+enum mlType
+{
+	SVM
 };
 struct param
 {
@@ -122,6 +165,7 @@ enum colorMap
 {
 	custom = 0
 };
+/*
 // Applies a custom colormapping to an image. Incomplete
 static cv::Mat applyColorMap(cv::InputArray input, colorMap map, double max, double min)
 {
@@ -147,12 +191,14 @@ static cv::Mat applyColorMap(cv::InputArray input, colorMap map, double max, dou
 
 	return M;
 }
+*/
 static const QList<statMethod> STAT_METHODS(QList<statMethod>()
-				<<wholeImage<<ROI<<superPixel<<perPixel<<keyPoint);
+				<<wholeImage<<ROI<<superPixel<<perPixel<<keyPoint<<mask);
 static const QList<compoundFilterType> COMPOUND_FILTER_TYPES(QList<compoundFilterType>()
 				<<add<<subtract<<align);
 static const QList<statType> STAT_TYPES(QList<statType>()
-				<<sum<<avg<<median<<stdev<<hist<<sift<<HoG<<orb<<surf<<circle<<line<<lineP);
+				<<sum<<avg<<copy<<median<<stdev<<hist<<sift<<HoG<<orb<<surf<<circle<<line<<lineP);
+
 class container: public QTreeWidgetItem
 {
 public:
@@ -182,6 +228,12 @@ public:
 		load();
 	virtual bool
 		save();
+	// Recursive search for a specific child based on name
+	virtual containerPtr getChild(QString name);
+	virtual containerPtr getChild(container* ptr);
+	virtual bool deleteChild(QString name);
+	virtual bool deleteChild(container* ptr);
+
 	// ************ members *********************
 	// True if saved back to the img sources widget for further handling
 	bool				cached;
@@ -201,7 +253,7 @@ public:
 	QString				name;
 	containerType		type;
 	container*			parentContainer;
-	QList<container*>	childContainers;
+	QList<containerPtr>	childContainers;
 	virtual void
 		updateDisplay();
 };
@@ -230,7 +282,9 @@ public:
 	featureContainer(QTreeWidget* parent = 0);
 	featureContainer(QTreeWidgetItem* parent);
 	~featureContainer();
+	bool save();
 	std::vector<cv::Point2f> keyPts;
+	cv::Mat	label;
 	double maxVal;
 	double minVal;
 };
@@ -264,19 +318,19 @@ public slots:
 	// Handles an updates to the processing parameters
 	virtual void		update();
 	// Set the input container for processing
-	virtual void		setInput(container* cont);
+	virtual void		setInput(containerPtr cont);
 	// Process data
-	virtual container*	process(container* cont);
+	virtual containerPtr	process(containerPtr cont_);
 	// Make a copy with current parameters for display
-	virtual container*  getDisplayCopy();
+	containerPtr	  getDisplayCopy();
 
 
 signals:
 	void accepted();
 	void canceled();
 	void log(QString line, int level);
-	void processingFinished(container* cont);
-	void featureMatrix(container* cont);
+	void processingFinished(containerPtr cont);
+	void featureMatrix(containerPtr cont);
 	void displayMatrix(cv::Mat img);
 	void parameterUpdated();
 
@@ -289,10 +343,15 @@ private:
 class mlContainer : public processingContainer
 {
 public:
-	explicit mlContainer(QTreeWidget* parent = 0);
-	explicit mlContainer(QTreeWidgetItem* parent);
-	~mlContainer();
-	container* process(cv::InputArray input_);
+	explicit	mlContainer(QTreeWidget* parent = 0, mlType type_ = SVM);
+	explicit	mlContainer(QTreeWidgetItem* parent, mlType type_ = SVM);
+				~mlContainer();
+	void		initialize();
+	void		train(cv::Mat features, cv::Mat labels);
+	float		test(cv::Mat features, cv::Mat labels);
+	bool		save();
+	bool		load();
+	mlType		MLType;
 };
 // *********************** imgContainer *****************************
 class imgContainer : public matrixContainer
@@ -356,14 +415,15 @@ public:
 	labelContainer(QTreeWidget* parent);
 	labelContainer(QTreeWidgetItem* parent);
 	// absFilePath is the absolute path to this file, parentName is the base name of the parent object, parent is a pointer to the widget
-	labelContainer(QString absFilePath, QString parentName, QTreeWidgetItem* parent);
+	labelContainer(QString absFilePath, QString parentName,  QTreeWidgetItem* parent);
 	~labelContainer();
 	bool
 		load();
 	bool 
 		save();
 	int label;
-	QList<std::vector<cv::Point>> polygons;
+	QString className;
+    QList<std::vector<cv::Point> > polygons;
 };
 // *********************** filterContainer *************************
 // Filter name and parameters
@@ -381,50 +441,53 @@ public:
 	int numParameters;
 	int idx;
 	// Keep a copy of the input so that it can be reprocessed easily on parameter update
-	container* input;
-	//
-	imgContainer* output;
-	// Previous processing step
-	filterContainer*								filterParent;
-	// Next processing step
-	filterContainer*								filterChild;
-	std::vector<boost::shared_ptr<boost::thread>>	procThreads;
-	QPushButton*									buttonPtr;
+	containerPtr		input;
 
-	container*  getDisplayCopy();
-	void		makeDisplayCopy();
+	imgPtr				output;
+	// Previous processing step
+	filterPtr			filterParent;
+	// Next processing step
+	filterPtr			filterChild;
+	
+	QPushButton*		buttonPtr;
+
+	filterPtr			getDisplayCopy();
+	void				makeDisplayCopy();
 	//public slots:
-	void			writeSettingsXML(cv::FileStorage& fs);
-	void			initialize();
-	imgContainer*		process(container* cont);
-	imgContainer*		process();
-	void			setInput(container* cont);
-	void			update();
+	void				writeSettingsXML(cv::FileStorage& fs);
+	void				initialize();
+	containerPtr		process(containerPtr cont);
+	void				setInput(containerPtr cont);
+	void				update();
 	
 
 signals:
 
 private:
-	void				gradientOrientationHelper(cv::Mat gradX, cv::Mat gradY, cv::Mat orientation, int threadNum);
-	imgContainer*		processThreshold(cv::Mat img);
-	imgContainer*		processErode(cv::Mat img);
-	imgContainer*		processDilate(cv::Mat img);
-	imgContainer*		processSobel(cv::Mat img);
-	imgContainer*		processSmooth(cv::Mat img);
-	imgContainer*		processGabor(cv::Mat img);
-	imgContainer*		processResize(cv::Mat img);
-	imgContainer*		processCrop(cv::Mat img);
-	imgContainer*		processGrey(cv::Mat img);
-	imgContainer*		processHSV_hue(cv::Mat img);
-	imgContainer*		processHSV_sat(cv::Mat img);
-	imgContainer*		processHSV_value(cv::Mat img);
-	imgContainer*		processLaplacian(cv::Mat img);
-	imgContainer*		processPyrMeanShift(cv::Mat img);
-	imgContainer*		processScharr(cv::Mat img);
-	imgContainer*		processCanny(cv::Mat img);
-	imgContainer*		processGradientOrientation(cv::Mat img);
+	void		gradientOrientationHelper(cv::Mat gradX, cv::Mat gradY, cv::Mat orientation, int threadNum);
+	imgPtr		processThreshold(cv::Mat img);
+	imgPtr		processErode(cv::Mat img);
+	imgPtr		processDilate(cv::Mat img);
+	imgPtr		processSobel(cv::Mat img);
+	imgPtr		processSmooth(cv::Mat img);
+	imgPtr		processGabor(cv::Mat img);
+	imgPtr		processResize(cv::Mat img);
+	imgPtr		processCrop(cv::Mat img);
+	imgPtr		processGrey(cv::Mat img);
+	imgPtr		processHSV(cv::Mat img);
+	imgPtr		processHSV_hue(cv::Mat img);
+	imgPtr		processHSV_sat(cv::Mat img);
+	imgPtr		processHSV_value(cv::Mat img);
+	imgPtr		processLaplacian(cv::Mat img);
+	imgPtr		processPyrMeanShift(cv::Mat img);
+	imgPtr		processScharr(cv::Mat img);
+	imgPtr		processCanny(cv::Mat img);
+	imgPtr		processGradientOrientation(cv::Mat img);
+	imgPtr		processNonMaxSuppress(cv::Mat img);
 	// Requires a boolean input image
-	imgContainer*		processContourFilter(cv::Mat img);
+	imgPtr		processContourFilter(cv::Mat img);
+
+    std::vector<boost::shared_ptr<boost::thread> >	procThreads;
 
 };
 // *********************** compoundFilterContainer *****************
@@ -436,6 +499,10 @@ public:
 	~compoundFilterContainer();
 };
 // *********************** featureExtractorContainer ****************
+// This object extracts features from an image in areas defined by the feature window container.
+// Given the sType which defines the type of feature to extract, this image will extract those features from
+// an input src image.  The input src image should be the region of interest from the feature window container.
+// dispImg is mostly used with keyPoint extractors like sift, and feature extractors such as hough lines.
 class featureExtractorContainer :public processingContainer
 {
 	Q_OBJECT
@@ -449,14 +516,18 @@ public:
 	~featureExtractorContainer();
 	statType			sType;
 	int					numFeatures;
-	bool				isKeyPoint;
+	bool				visualizableResult;
 	//public slots:
 
 	// Src is the source image to extract features
-	// Features is the container to put the features into
-	// dispImg is an image used for visualization of hte features
-	bool				extractFeatures(cv::Mat src, cv::Mat& features, cv::Mat& dispImg);
-	bool				extractKeyPoints(cv::Mat src, featureContainer* features, cv::Mat& dispImg);
+	// Features is the container to put the features into.  Pre initialized so now it just directly puts data into the matrix
+	// The other option here is to return a row of the feature matrix and copy it into the initialized feature matrix
+	// dispImg is an image used for visualization of the features
+	bool				extractFeatures(cv::Mat src, cv::Mat& features, cv::Mat* dispImg = NULL);
+	
+	// These extractors work on the entire image and extract things such as key points using sift, surf, orb, 
+	// or lines and circles
+	bool				extractKeyPoints(cv::Mat src, featurePtr features, cv::Mat* dispImg = NULL);
 	void				initialize();
 	void				recalculateNumParams();
 
@@ -466,31 +537,49 @@ signals:
 	void				updated();
 };
 // *********************** featureWindowContainer *******************
+// The feature window container class defines the technique used for extracting features from an image
+// Techniques include, whole image extraction, region of interest, super-pixel, perPixel, keypoint, and mask.
+// In all cases, if a mask is included, the mask will be used to determine regions of extraction.
+// An example of this would be using a mask with superPixel ectraction, this would extract features in a super pixel at each
+// point where the mask is non-negative.
 class featureWindowContainer : public processingContainer
 {
 	Q_OBJECT
 public:
-	featureWindowContainer::featureWindowContainer(QTreeWidget* parent = NULL);
-	featureWindowContainer::featureWindowContainer(QTreeWidget* parent, statMethod method_, featureExtractorContainer* curExtractor_);
-	featureWindowContainer::featureWindowContainer(QTreeWidgetItem* parent, statMethod method_, featureExtractorContainer* curExtractor_);
-	featureWindowContainer::featureWindowContainer(statMethod method_, featureExtractorContainer* curExtractor_);
-	featureWindowContainer::featureWindowContainer(statMethod method_);
-	featureWindowContainer::featureWindowContainer(featureWindowContainer* cpy);
+    featureWindowContainer(QTreeWidget* parent = NULL);
+	featureWindowContainer(QTreeWidget* parent, statMethod method_, featureExtractorPtr curExtractor_);
+	featureWindowContainer(QTreeWidgetItem* parent, statMethod method_, featureExtractorPtr curExtractor_);
+	featureWindowContainer(statMethod method_, featureExtractorPtr curExtractor_);
+    featureWindowContainer(statMethod method_);
+    featureWindowContainer(featureWindowContainer* cpy);
+
 	void						initialize();
-	featureContainer*			extractFeatures(imgContainer* src, cv::Mat &displayImg);
-	featureContainer*			extractFeatures(imgContainer* src, cv::Mat &displayImg, featureExtractorContainer* curExtractor_);
+	void						setSrc(imgPtr src);
+	void						setMask(cv::Mat mask);
+	void						setExtractor(featureExtractorPtr curExtractor_);
+	void						setDisplayImage(imgPtr img);
+	
+	// Given the input image
+	featurePtr						extractFeatures();
+	featurePtr						extractFeatures(imgPtr src);
+	featurePtr						extractFeatures(imgPtr src, cv::Mat mask_);
+	featurePtr						extractFeatures(imgPtr src, cv::Mat mask_, cv::Mat& displayImg);
+	featurePtr						extractFeatures(imgPtr src, cv::Mat mask_, cv::Mat& displayImg, featureExtractorPtr curExtractor_);
+
+
 	statMethod					method;
 public slots:
 	void						handleExtractorUpdate();
 
 signals:
 	void						displayImage(cv::Mat img);
-	void						extractedFeatures(featureContainer* f);
-private:
-	featureExtractorContainer*	curExtractor;
-	imgContainer*				curSource;
-	cv::Mat						dispImg;
+	void						extractedFeatures(featurePtr f);
 
+private:
+	featureExtractorPtr			curExtractor;
+	imgPtr						curSource;
+	cv::Mat						dispImg;
+	cv::Mat						mask;
 };
 // *********************** statContainer ***************************
 // Statistical extraction technique
@@ -501,10 +590,13 @@ public:
 	statContainer(QTreeWidgetItem* parent);
 	~statContainer();
 
-	featureExtractorContainer*	extractor;
-	featureWindowContainer*		window;
+	featureExtractorPtr			extractor;
+	featureWindowPtr			window;
+	QString						mask;
 	int							sourceIdx;
+	QString						inputName;
 };
+// *********************** filterMacro *****************************
 class filterMacro : public container
 {
 public:
@@ -514,7 +606,8 @@ public:
 	bool load(QString fileName);
 	bool save();
 	bool save(QString fileName);
-	QList<filterContainer*> filters;
+	QList<filterPtr> filters;
 	int numFilters;
 };
+
 #endif // CONTAINER_H

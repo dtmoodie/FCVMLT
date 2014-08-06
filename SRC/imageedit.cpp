@@ -1,6 +1,84 @@
 #include "imageedit.h"
 #include "ui_imageedit.h"
+imgDropLabel::imgDropLabel(QWidget* parent, imgSourcesWidget* sourceList_):
+	QLabel(parent)
+{
+	sourceList = sourceList_;
+	setAcceptDrops(true);
+}
+void
+imgDropLabel::setSourceList(imgSourcesWidget* sourceList_)
+{
+	sourceList = sourceList_;
+}
+void
+imgDropLabel::dragEnterEvent(QDragEnterEvent * event)
+{
+	const QMimeData* data = event->mimeData();
+	if (data->hasFormat("application/x-qabstractitemmodeldatalist"))
+	{
+		QObject* src = event->source();
+		if (src != NULL && sourceList != NULL)
+		{
+			if (src == (QObject*)sourceList->sourceList)
+			{
+				event->setDropAction(Qt::LinkAction);
+				event->accept();
+			}
+			else
+			{
+				event->ignore();
+			}
+		}
+	}
+}
+void 
+imgDropLabel::dragMoveEvent(QDragMoveEvent *event)
+{
+	const QMimeData* data = event->mimeData();
+	if (data->hasFormat("application/x-qabstractitemmodeldatalist"))
+	{
+		QObject* src = event->source();
+		if (src != NULL && sourceList != NULL)
+		{
+			if (src == (QObject*)sourceList->sourceList)
+			{
+				event->setDropAction(Qt::LinkAction);
+				event->accept();
+			}
+			else
+			{
+				event->ignore();
+			}
+		}
+	}
+}
+void 
+imgDropLabel::dropEvent(QDropEvent *event)
+{
+	const QMimeData* data = event->mimeData();
+	if (data->hasFormat("application/x-qabstractitemmodeldatalist"))
+	{
+		QObject* src = event->source();
+		if (src != NULL && sourceList != NULL)
+		{
+			if (src == (QObject*)sourceList->sourceList)
+			{
+				QTreeWidgetItem* item = sourceList->sourceList->currentItem();
+				event->setDropAction(Qt::LinkAction);
+				event->accept();
 
+				containerPtr img = sourceList->getContainer(dynamic_cast<container*>(item));
+				if (img == NULL) return;
+				emit imgReceived(img);
+			}
+			else
+			{
+				event->ignore();
+			}
+		}
+	}
+}
 
 #ifdef OPENGL
 GLimageEdit::GLimageEdit(QWidget *parent)
@@ -29,11 +107,13 @@ GLimageEdit::showImage(cv::Mat image)
 	GLuint texID;
 	glGenTextures(1, &texID);
 	glBindTexture(GL_TEXTURE_RECTANGLE, texID);
+	
 	if (image.type() == CV_8UC3)
 		glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_BGR, image.cols, image.rows,
 		0, GL_BGR, GL_UNSIGNED_INT8_VEC3_NV, image.data);
 	else
 		return false;
+	
 	glBegin(GL_QUADS);
 	glTexCoord2f(0, 0);
 	glVertex2f(0, 0);
@@ -44,6 +124,7 @@ GLimageEdit::showImage(cv::Mat image)
 	glTexCoord2f(0, image.rows);
 	glVertex2f(0, height());
 	glEnd();
+	
 	glDisable(GL_TEXTURE_RECTANGLE);
 
 	if (mOrigImage.channels() == 3)
@@ -215,17 +296,22 @@ GLimageEdit::renderImage()
 	}
 }
 #endif // OPENGL
-imageEdit::imageEdit(QWidget *parent) :
-    QWidget(parent),
-    labeling(false),
-    className(NULL),
-    classAdd(NULL),
-    clearLabel(NULL),
-    acceptLabel(NULL),
+imageEdit::imageEdit(QWidget *parent, imgSourcesWidget* sourceList_) :
+	QWidget(parent),
+	labeling(false),
+	className(NULL),
+	classAdd(NULL),
+	clearLabel(NULL),
+	acceptLabel(NULL),
 	aspectRatioLabel(NULL),
 	labelHeight(NULL),
 	labelWidth(NULL),
-    ui(new Ui::imageEdit)
+	ui(new Ui::imageEdit),
+	_erase(NULL),
+	_draw(NULL),
+	_editing(false),
+	_toolSize(0),
+	sourceList(sourceList_)
 {
     blockUpdate = false;
     zoomFactor = 1.0;
@@ -241,6 +327,7 @@ imageEdit::imageEdit(QWidget *parent) :
     imgDisp->setMinimumWidth(320);
     imgDisp->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 	imgDisp->installEventFilter(this);
+	
 #endif
     layout->addWidget(imgDisp,0,0,1,4);
 	lineEdit = new QLineEdit(this);
@@ -254,6 +341,12 @@ imageEdit::imageEdit(QWidget *parent) :
 	connect(ptr, SIGNAL(enterPressed()), this, SLOT(handleAddClass()));
 	useColormap = false;
 	numThreads = 8;
+	_editingEnable = new QAction(this);
+	imgDisp->addAction(_editingEnable);
+	_editingEnable->setText("Enable editing");
+	_editingEnable->setCheckable(true);
+	connect(_editingEnable, SIGNAL(checked(bool)), this, SLOT(handleImageEditing(bool)));
+	setAcceptDrops(true);
 }
 imageEdit::~imageEdit()
 {
@@ -287,6 +380,29 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
 			float scaleY = (float)currentROI.height / (float)imgDisp->height();
 			float posX = scaleX*pos.x() + currentROI.x;
 			float posY = scaleY*pos.y() + currentROI.y;
+			cv::Point orgImgPoint(posX, posY);
+			if (QApplication::keyboardModifiers() == Qt::ControlModifier && _editing)
+			{
+				cv::Rect drawRect(posX - _toolSize, posY - _toolSize, _toolSize * 2 + 1, _toolSize * 2 + 1);
+				try
+				{
+					dispImg(drawRect) = _drawTool;
+				}
+				catch (cv::Exception &e)
+				{
+					return true;
+				}
+				if (_drawEnabled)
+				{
+					emit drawPt(drawRect, _drawTool);
+				}
+				if (_eraseEnabled)
+				{
+					emit erasePt(drawRect);
+				}
+				handleROIUpdate(currentROI);
+			}
+
 			if (posY >= orgImg.rows || posX >= orgImg.cols) return false;
 			QString value;
 			if (orgImg.type() == CV_8U)
@@ -336,12 +452,15 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
 
 			float scaleX = (float)currentROI.width / (float)imgDisp->width();
 			float scaleY = (float)currentROI.height / (float)imgDisp->height();
+			float posXS = scaleX*lastPos.x() + currentROI.x;
+			float posYS = scaleY*lastPos.y() + currentROI.y;
+
 			float posXE = scaleX*end.x() + currentROI.x;
 			float posYE = scaleY*end.y() + currentROI.y;
 			// Point in original image without scaling or shifting
 			cv::Point orgImgPoint(posXE, posYE);
-
-			if (QApplication::keyboardModifiers() == Qt::ControlModifier)
+			
+			if (QApplication::keyboardModifiers() == Qt::ControlModifier && !_editing)
 			{
 				float x = MIN(orgImgPoint.x, firstClickInOriginal.x);
 				float y = MIN(orgImgPoint.y, firstClickInOriginal.y);
@@ -349,6 +468,20 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
 				float height = abs(orgImgPoint.y - firstClickInOriginal.y);
 				cv::Rect rect(x, y, width, height);
 				emit rectSelect(rect);
+			}
+			if (_editing)
+			{
+				if (QApplication::keyboardModifiers() == Qt::ControlModifier && _drawLine)
+				{
+					cv::Mat draw;
+					cv::Point start(scaleX*lastPos.x(), scaleY*lastPos.y());
+					cv::Point cvend(scaleX*end.x(), scaleY*end.y());
+					roiImg.copyTo(draw);
+					cv::line(draw,start,cvend , cv::Scalar(0, 0, 255), 1);
+					drawImg(draw);
+					emit lineDrawn(start, cvend);
+					return true;
+				}
 			}
             return true;
         }
@@ -367,8 +500,31 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
 			float posYE = scaleY*pos.y() + currentROI.y;
 			// Point in original image without scaling or shifting
 			cv::Point orgImgPoint(posXE, posYE);
+			if (QApplication::keyboardModifiers() == Qt::ControlModifier && _editing)
+			{
+				cv::Rect drawRect(posXE - _toolSize, posYE - _toolSize, _toolSize * 2 + 1, _toolSize * 2 + 1);
+				try
+				{
+					_drawTool.copyTo(dispImg(drawRect));
+				}catch (cv::Exception &e)
+				{
+					return true;
+				}
+				if (_drawEnabled)
+				{
+					emit drawPt(drawRect, _drawTool);
+				}
+				if (_eraseEnabled)
+				{
+					emit erasePt(drawRect);
+				}
+				handleROIUpdate(currentROI);
+			}
+
             if(dragging == true)
                 emit dragPos(pos);
+			
+			// Move the viewport
 			if (QApplication::keyboardModifiers() != Qt::AltModifier  && 
 				QApplication::keyboardModifiers() != Qt::ControlModifier && 
 				dragging)
@@ -388,11 +544,17 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
                     return true;
                 }
             }
-
+			if (_editing && dragging && _drawLine)
+			{
+				cv::Mat tmp;
+				roiImg.copyTo(tmp);
+				cv::line(tmp, cv::Point(lastPos.x(), lastPos.y()), cv::Point(pos.x(), pos.y()), cv::Scalar(0, 0, 255));
+				drawImg(tmp);
+			}
 			// Handle free form region of interest mask creation
 			if (labeling)
 			{	
-				if (QApplication::keyboardModifiers() == Qt::AltModifier)// && (labelWidth->value() == 0 || labelHeight->value() == 0))
+				if (QApplication::keyboardModifiers() == Qt::AltModifier)
 				{
 					polygonInOriginal.push_back(orgImgPoint);
 				}
@@ -426,6 +588,7 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
 				return true;
 			}
         }
+		// Handle zooming
         if(ev->type() == QEvent::Wheel)
         {
             QWheelEvent* event = dynamic_cast<QWheelEvent*>(ev);
@@ -493,17 +656,155 @@ imageEdit::changeImg(container *cont)
 		break;
 	}
 	}
-		
+}
+void
+imageEdit::changeImg(containerPtr cont)
+{
+	changeImg(cont.get());
+	emit imageChanged(boost::dynamic_pointer_cast<imgContainer, container>(cont));
 }
 void 
 imageEdit::changeImg(cv::Mat img)
 {
 	changeImg(img, true);
 }
+void
+imageEdit::changeImg(cv::Mat img, bool update)
+{
+	if (img.empty()) return;
+	emit sendPairedImage(img);
+	if (update)
+	{
+		adjustROI(img);
+	}
+	if (img.channels() == 3)
+	{
+		try
+		{
+			cv::cvtColor(img, orgImg, CV_BGR2RGB);
+		}
+		catch (cv::Exception &e)
+		{
+			emit log("Error: " + QString::fromLocal8Bit(e.what()), 2);
+		}
+	}
+	else orgImg = img;
+	if (useColormap && orgImg.channels() == 1)
+	{
+		dispImg = colorMapImg(img);
+	}
+	else
+	{
+		dispImg = orgImg;
+	}
+	try
+	{
+		roiImg = dispImg(currentROI);
+	}
+	catch (cv::Exception &e)
+	{
+
+	}
+	drawImg(roiImg);
+}
+void 
+imageEdit::dragEnterEvent(QDragEnterEvent *event)
+{
+	const QMimeData* data = event->mimeData();
+	if (data->hasFormat("application/x-qabstractitemmodeldatalist"))
+	{
+		QObject* src = event->source();
+		if (src != NULL && sourceList != NULL)
+		{
+			if (src == (QObject*)sourceList->sourceList)
+			{
+				event->setDropAction(Qt::LinkAction);
+				event->accept();
+			}else
+			{
+				event->ignore();
+			}
+
+		}
+	}
+}
+void 
+imageEdit::dragMoveEvent(QDragMoveEvent *event)
+{
+	const QMimeData* data = event->mimeData();
+	if (data->hasFormat("application/x-qabstractitemmodeldatalist"))
+	{
+		QObject* src = event->source();
+		if (src != NULL && sourceList != NULL)
+		{
+			if (src == (QObject*)sourceList->sourceList)
+			{
+				event->setDropAction(Qt::LinkAction);
+				event->accept();
+			}else
+			{
+				event->ignore();
+			}
+		}
+	}
+}
+void 
+imageEdit::dropEvent(QDropEvent *event)
+{
+	const QMimeData* data = event->mimeData();
+	if (data->hasFormat("application/x-qabstractitemmodeldatalist"))
+	{
+		QObject* src = event->source();
+		if (src != NULL && sourceList != NULL)
+		{
+			if (src == (QObject*)sourceList->sourceList)
+			{
+				event->setDropAction(Qt::LinkAction);
+				event->accept();
+				QByteArray d = data->data("application/x-qabstractitemmodeldatalist");
+				QString name = QString::fromWCharArray((wchar_t*)d.data(), d.size() / 2);
+				QString name2 = name.mid(13, name.size() - 18);
+				containerPtr img = sourceList->getContainer(name2);
+				if (img == NULL) return;
+				changeImg(img);
+			}
+			else
+			{
+				event->ignore();
+			}
+		}
+	}
+}
+void 
+imageEdit::handleImageEditing(bool enable)
+{
+	if (enable)
+	{
+		if (_draw == NULL) _draw = new QAction(this);
+		if (_erase == NULL) _erase = new QAction(this);
+		addAction(_draw);
+		addAction(_erase);
+		_draw->setCheckable(true);
+		_erase->setCheckable(true);
+		connect(_draw, SIGNAL(checked(bool)), this, SLOT(handleDrawToggled(bool)));
+		connect(_erase, SIGNAL(checked(bool)), this, SLOT(handleEraseToggled(bool)));
+	}else
+	{
+		disconnect(_draw, SIGNAL(checked(bool)), this, SLOT(handleDrawToggled(bool)));
+		disconnect(_erase, SIGNAL(checked(bool)), this, SLOT(handleEraseToggled(bool)));
+	}
+}
 void 
 imageEdit::toggleColormap(bool value)
 {
 	useColormap = value;
+	if (value)
+	{
+		if (dispImg.channels() == 1)
+		{
+			dispImg = colorMapImg(dispImg);
+		}
+	}
 	handleROIUpdate(currentROI);
 }
 void 
@@ -546,6 +847,38 @@ imageEdit::receivePairedImage(cv::Mat img)
 	}
 	handleROIUpdate(currentROI);
 }
+void
+imageEdit::handleSaveDrawing()
+{
+	curCont->_M = dispImg;
+	curCont->baseName.append("_edited");
+	curCont->save();
+}
+void
+imageEdit::mirrorDraw(cv::Rect rect, cv::Mat tool)
+{
+	if (tool.type() != dispImg.type())
+	{
+		tool = cv::Mat::zeros(tool.size(), dispImg.type());
+		for (int i = 0; i < tool.rows*tool.cols; ++i)
+		{
+			tool.at<cv::Vec3b>(i) = cv::Vec3b(255, 0, 0);
+		}
+	}
+	tool.copyTo(dispImg(rect));
+	handleROIUpdate(currentROI);
+}
+void
+imageEdit::mirrorErase(cv::Rect rect)
+{
+	orgImg(rect).copyTo(dispImg(rect));
+	handleROIUpdate(currentROI);
+}
+void
+imageEdit::receivePairedImage(cv::Mat img, cv::Rect ROI)
+{
+
+}
 void 
 imageEdit::drawImg(cv::Mat img)
 {
@@ -572,7 +905,7 @@ imageEdit::drawImg(cv::Mat img)
 			cv::minMaxIdx(img, &minVal, &maxVal);
 			disp = 255 * (img - minVal) / (maxVal - minVal);
 			disp.convertTo(disp, CV_8U);
-			cv::applyColorMap(disp, disp, cv::COLORMAP_HSV);
+            //cv::applyColorMap(disp, disp, cv::COLORMAP_HSV);
 			QImage tmpImg((uchar*)disp.data, disp.cols, disp.rows, disp.step, QImage::Format_RGB888);
 			pixmap = QPixmap::fromImage(tmpImg);
 			imgDisp->setPixmap(pixmap.scaled(imgDisp->width(), imgDisp->height()));
@@ -589,7 +922,7 @@ imageEdit::drawImg(cv::Mat img)
 		cv::minMaxIdx(img, &minVal, &maxVal);
 		disp = 255 * (img - minVal) / (maxVal - minVal);
 		disp.convertTo(disp, CV_8U);
-		cv::applyColorMap(disp, disp, cv::COLORMAP_HSV);
+        //cv::applyColorMap(disp, disp, cv::COLORMAP_HSV);
 		QImage tmpImg((uchar*)disp.data, disp.cols, disp.rows, disp.step, QImage::Format_RGB888);
 		pixmap = QPixmap::fromImage(tmpImg);
 		imgDisp->setPixmap(pixmap.scaled(imgDisp->width(), imgDisp->height()));
@@ -601,8 +934,8 @@ imageEdit::drawImg(cv::Mat img)
 		cv::minMaxIdx(img, &minVal, &maxVal);
 		disp = 255 * (img - minVal) / (maxVal - minVal);
 		disp.convertTo(disp, CV_8U);
-		cv::applyColorMap(disp, disp, cv::COLORMAP_HSV);
-		QImage tmpImg((uchar*)disp.data, disp.cols, disp.rows, disp.step, QImage::Format_RGB888);
+        //cv::applyColorMap(disp, disp, cv::COLORMAP_HSV);
+		QImage tmpImg((uchar*)disp.data, disp.cols, disp.rows, disp.step, QImage::Format_Indexed8);
 		pixmap = QPixmap::fromImage(tmpImg);
 		imgDisp->setPixmap(pixmap.scaled(imgDisp->width(), imgDisp->height()));
 	}
@@ -614,74 +947,80 @@ imageEdit::drawImg(cv::Mat img)
 		pixmap = QPixmap::fromImage(tmpImg);
 		imgDisp->setPixmap(pixmap.scaled(imgDisp->width(), imgDisp->height()));
 	}
+	boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
+	boost::posix_time::time_duration delta = end - start;
+	log("Displaying image took " + QString::number(delta.total_milliseconds()) + " milliseconds", 0);
 #else
 	imgDisp->showImage(img);
 
 #endif
-	boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
-	boost::posix_time::time_duration delta = end - start;
-	log("Displaying image took " + QString::number(delta.total_milliseconds()) + " milliseconds", 0);
-}
-void 
-imageEdit::changeImg(cv::Mat img, bool update)
-{
-	if (img.empty()) return;
-	emit sendPairedImage(img);
-	if (update)
-	{
-		adjustROI(img);
-	}
-	if (img.channels() == 3)
-		cv::cvtColor(img, orgImg, CV_BGR2RGB);
-	else orgImg = img;
-	if (useColormap && orgImg.channels() == 1)
-	{
-		// Build a lookup table for this dataset
-		if (LUT.size() == 0 || updateLUT)
-		{
-			if (minVal == maxVal && minVal == 0)
-			{
-				double tmpMin, tmpMax;
-				cv::minMaxIdx(img, &tmpMin, &tmpMax);
-				minVal = tmpMin;
-				maxVal = tmpMax;
-			}
-			buildLUT(maxVal - minVal);
-		}
-		if (orgImg.type() == CV_32F)
-		{
 
-		}
-		if (orgImg.type() == CV_16U)
+}
+cv::Mat 
+imageEdit::colorMapImg(cv::Mat img)
+{
+	// Check if current bounds are sufficient
+	double tmpMin, tmpMax;
+	cv::minMaxIdx(img, &tmpMin, &tmpMax);
+	if (tmpMin != minVal || tmpMax != maxVal)
+	{
+		updateLUT = true;
+		minVal = tmpMin;
+		maxVal = tmpMax;
+	}
+	// Build a lookup table for this dataset if needed
+	if (LUT.size() == 0 || updateLUT)
+	{
+		buildLUT(maxVal - minVal);
+	}
+	if (orgImg.type() == CV_16U || orgImg.type() == CV_8U)
+	{
+		boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
+		float scale = (float)COLORMAP_RESOLUTION / (maxVal - minVal);
+		cv::Mat output = cv::Mat::zeros(orgImg.size(), CV_8UC3);
+        std::vector<boost::shared_ptr<boost::thread> > threads;
+		threads.reserve(numThreads);
+		for (int i = 0; i < numThreads; ++i)
 		{
-			boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
-			float val, nVal;
-			int iVal;
-			float scale = (float)COLORMAP_RESOLUTION / (maxVal - minVal);
-			dispImg = cv::Mat::zeros(orgImg.size(), CV_8UC3);
-			for (int i = 0; i < orgImg.rows * orgImg.cols; ++i)
-			{
-				iVal = orgImg.at<unsigned short>(i);
-				dispImg.at<cv::Vec3b>(i) = LUT[iVal - minVal];
-			}
-			cv::Mat tmp = dispImg;
-			boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
-			boost::posix_time::time_duration delta = end - start;
-			log("Color mapping took " + QString::number(delta.total_milliseconds()) + " milliseconds", 0);
+            boost::shared_ptr<boost::thread> thr(new boost::thread( boost::bind(&imageEdit::colorMapHelper, orgImg, output, minVal, LUT, i, numThreads) ) );
+            threads.push_back(thr);
 		}
-	}else
-	{
-		dispImg = orgImg;
+		for (int i = 0; i < numThreads; ++i)
+		{
+            threads[i]->join();
+		}
+		cv::Mat tmp = output; // Just used so I can check the image with image watch
+		boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
+		boost::posix_time::time_duration delta = end - start;
+		log("Color mapping took " + QString::number(delta.total_milliseconds()) + " milliseconds", 0);
+		return output;
 	}
-	try
+	return img;
+}
+void
+imageEdit::colorMapHelper(cv::Mat src, cv::Mat dest, int minVal, std::vector<cv::Vec3b>& LUT, int threadNum, int numThreads)
+{
+	if (dest.size() != src.size()) return;
+	if (LUT.size() < 10) return;
+	if (src.type() == CV_8U)
 	{
-		roiImg = dispImg(currentROI);
+		unsigned char val;
+		for (int i = threadNum; i < src.rows*src.cols; i += numThreads)
+		{
+			val = src.at<unsigned char>(i);
+			dest.at<cv::Vec3b>(i) = LUT[val - minVal];
+		}
 	}
-	catch (cv::Exception &e)
+	if (src.type() == CV_16S)
 	{
-		
+		unsigned short val;
+		for (int i = threadNum; i < src.rows*src.cols; i += numThreads)
+		{
+			val = src.at<unsigned short>(i);
+			dest.at<cv::Vec3b>(i) = LUT[val - minVal];
+		}
 	}
-	drawImg(roiImg);
+	
 }
 void 
 imageEdit::adjustROI(cv::Mat img)
@@ -703,7 +1042,6 @@ imageEdit::buildLUT(int maxVal)
 	double range = minVal - maxVal;
 	//double scale = range / (double)COLORMAP_RESOLUTION;
 	LUT.resize(maxVal + 1);
-#ifndef MULTI_THREAD
 	colorScale RED(50,			255 / 25,	true);
 	colorScale GREEN(25 / 3,	255 / 25,	true);
 	colorScale BLUE(0,			255/25,		true);
@@ -714,35 +1052,9 @@ imageEdit::buildLUT(int maxVal)
 	{
 		LUT[i] = cv::Vec3b(RED(location), GREEN(location), BLUE(location));
 	}
-#else
-	std::vector<boost::thread> threads;
-	threads.reserve(numThreads);
-	for (int i = 0; i < numThreads; ++i)
-	{
-		threads.push_back(boost::thread(boost::bind(&imageEdit::buildLUThelper, this, i, maxVal)));
-	}
-	for (int i = 0; i < numThreads; ++i)
-	{
-		threads[i].join();
-	}
-#endif
 	boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
 	boost::posix_time::time_duration delta = end - start;
 	emit log("Lookup table construction took " + QString::number(delta.total_milliseconds()) + " milliseconds", 0);
-}
-void
-imageEdit::buildLUThelper(int threadNum, int maxVal)
-{
-	colorScale RED(50, 255 / 25, true);
-	colorScale GREEN(25 / 3, 255 / 25, true);
-	colorScale BLUE(0, 255 / 25, true);
-	BLUE.inverted = true;
-	double step = 100.0 / (double)maxVal;
-	double location = 0.0;
-	for (int i = threadNum; i <= maxVal; i += numThreads, location+= step)
-	{
-		LUT[i] = cv::Vec3b(RED(location), GREEN(location), BLUE(location));
-	}
 }
 cv::Rect 
 imageEdit::calcRect(QPoint start_, QPoint end_)
@@ -802,6 +1114,35 @@ imageEdit::handleROIUpdate(cv::Rect ROI)
 	}
 }
 void 
+imageEdit::handleDrawToggled(bool val)
+{
+	_editing = val;
+	_drawEnabled = val;
+	_eraseEnabled = !val;
+	_drawTool = cv::Mat::ones(_toolSize * 2 + 1, _toolSize * 2 + 1, orgImg.type());
+	_drawTool = _drawTool * 255;
+}
+void
+imageEdit::handleEraseToggled(bool val)
+{
+	_editing = val;
+	_eraseEnabled = val;
+	_drawEnabled = !val;
+	_drawTool = cv::Mat::zeros(_toolSize * 2 + 1, _toolSize * 2 + 1, orgImg.type());
+}
+void 
+imageEdit::handleSizeChanged(int val)
+{
+	_toolSize = val;
+	_drawTool = cv::Mat::zeros(_toolSize * 2 + 1, _toolSize * 2 + 1, orgImg.type());
+}
+void
+imageEdit::handleLineToggled(bool val)
+{
+	_editing = val;
+	_drawLine = val;
+}
+void 
 imageEdit::handleLog(QString text, int level)
 {
 	emit log(text, level);
@@ -835,7 +1176,7 @@ imageEdit::labelImg()
 	if (aspectRatioLabel == NULL)
 	{
 		aspectRatioLabel = new QLabel(this);
-		layout->addWidget(aspectRatioLabel, 2, 0);
+		layout->addWidget(aspectRatioLabel, 3, 0);
 		aspectRatioLabel->setText("Aspect ratio: Width, Height");
 	}
 	if (aspectRatioLabel->isHidden()) aspectRatioLabel->show();
@@ -953,21 +1294,21 @@ imageEdit::handleAcceptLabel()
         return;
     }
 
-    //emit label(labelMask,classSelect->currentIndex());
-	// Create a child of the current source image that will hold this label for display
-	labelContainer* child = new labelContainer(dynamic_cast<QTreeWidget*>(curCont));
+	labelPtr child( new labelContainer(dynamic_cast<QTreeWidget*>(curCont)) );
+	child->className = txtLabel;
 	child->M() = labelMask;
 	child->isTop = false;
 	child->label = lbl;
-    child->setText(0,classSelect->currentText() + " mask");
+    child->setText(0,txtLabel + " mask");
 	child->setText(1, QString::number(lbl));
 	child->polygons.push_back(polygonInOriginal);
 	child->dirName = curCont->dirName + "/labels";
 	child->baseName = curCont->baseName;
 	polygonInOriginal.clear();
 	child->save();
-	curCont->addChild(child);
-	emit label(child);
+	curCont->addChild(child.get());
+	curCont->childContainers.push_back(child);
+	emit label(child.get());
 }
 int 
 imageEdit::handleAddClass()
@@ -984,7 +1325,7 @@ imageEdit::handleAddClass()
 	}
 	if (name == "-1" || name.compare("negative", Qt::CaseInsensitive) == 0 || name.compare("neg", Qt::CaseInsensitive) == 0) label = -1;
 	if (name ==  "1" || name.compare("positive", Qt::CaseInsensitive) == 0 || name.compare("pos", Qt::CaseInsensitive) == 0) label =  1;
-	classSelect->addItem(name);
+	//classSelect->addItem(name);
 	classes.push_back( std::pair<QString, int>(name, label) );
 
 

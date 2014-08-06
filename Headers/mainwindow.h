@@ -10,6 +10,7 @@
 #include <QTextEdit>
 #include <QPlainTextEdit>
 #include <qfile.h>
+#include <qthread.h>
 
 //#include <container.h>
 #include <filterwidget.h>
@@ -22,6 +23,7 @@
 #include "savestreamdialog.h"
 //#include "cqtopencvviewergl.h"
 #include "registrationdialog.h"
+#include "drawtoolwidget.h"
 #include <sstream>
 
 
@@ -79,13 +81,17 @@ private slots:
 	void on_actionMergeImageDisplays(bool val);
 
 	void handleOpenRegistration();
+
+	void handleOpenDrawMenu();
 signals:
 
     void consoleOutput(QString msg);
 private:
     Ui::MainWindow *ui;
     QGridLayout*        layout;
-
+	QThread*				filterThread;
+	QThread*				sourceDisplayThread;
+	QThread*				filteredDisplayThread;
     filterWidget*			filter;
     imgSourcesWidget*		sources;
     imgStatsWidget*			stats;
@@ -114,6 +120,9 @@ private:
 	QAction*			linkViews;
 	QFile*				logFile;
 	registrationDialog* regDialog;
+	// Drawing stuff
+	drawToolWidget*		drawWidget;
+	QDialog*			drawDialog;
 };
 
 #endif // MAINWINDOW_H

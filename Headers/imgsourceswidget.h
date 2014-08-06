@@ -23,6 +23,7 @@ public:
     QTreeWidget* sourceList;
     QLabel* sourceView;
 	container* curCont;
+	QList<imgPtr> sources;
 public slots:
 	
     void handleItemChange(QTreeWidgetItem* current,QTreeWidgetItem* previous);
@@ -35,19 +36,27 @@ public slots:
 
     void cameraUpdated();
 	void cameraUpdated(cv::Mat img);
+	// Searches sources based on baseName and source children based on name
+	containerPtr getContainer(QString name);
+	containerPtr getContainer(container* ptr);
+	void handleViewMatrix();
 
 signals:
 	// Emitted on single click
     void sourcePreview(cv::Mat img);
     void sourcePreview(container* cont);
+	void sourcePreview(containerPtr cont);
 	// Emitted on double click
     void sourceChange(cv::Mat img);
     void sourceChange(container* cont);
+	void sourceChange(containerPtr cont);
+
+	void viewMatrix(cv::Mat M);
 
 private:
     Ui::imgSourcesWidget *ui;
-	QAction * _sourceAction;
-    
+	QAction *	_sourceSaveAction;
+	QAction*	_matrixViewAction;
 
 };
 

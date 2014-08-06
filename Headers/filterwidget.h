@@ -24,12 +24,13 @@ class filterWidget : public QWidget
 public:
     explicit filterWidget(QWidget *parent = 0, cv::Mat curImg_ = cv::Mat());
     ~filterWidget();
-    QList<filterContainer*> filters;
+    QList<filterPtr> filters;
     bool eventFilter(QObject *obj, QEvent *ev);
 public slots:
     void receiveImgChange(cv::Mat img_);
 
     void handleImgChange(container* cont);
+	void handleImgChange(containerPtr cont);
     void handleParamChange(int idx);
     void handleFilterAccepted();
 	void handleFilterSelect();
@@ -38,9 +39,9 @@ public slots:
     void handleFilterHistSelect(QTreeWidgetItem* item, int column);
 	// Triggered on double click
     void handleFilterHistActivate(QTreeWidgetItem* item, int column);
-	void handleFilterUpdated(container* filteredImg_); 
+	void handleFilterUpdated(containerPtr filteredImg_); 
 	void handleFilterUpdated();
-	void handleProcessingComplete(imgContainer* img, filterContainer* srcFilter);
+	void handleProcessingComplete(imgPtr img, filterContainer* srcFilter);
     void handleRectSelect(cv::Rect rectangle);
     void handleDragStart(QPoint pos);
     void handleDragMove(QPoint pos);
@@ -60,6 +61,7 @@ public slots:
 
 signals:
     void filterImgChanged(cv::Mat img);
+	void filterImgChanged(containerPtr img);
     void consoleOutput(QString text);
     void saveImage(cv::Mat img, QString name);
 	void log(QString line, int level);
@@ -68,11 +70,11 @@ private:
     QTreeWidget*		filterHistory;
     QGridLayout*		filterSelect;
     QGridLayout*		layout;
-	filterContainer*	currentFilter;
-	filterContainer*	currentDisplayFilter;
-	filterMacro*		currentMacro;
-	container*			currentBase;
-	container*			sourceImg;
+	filterPtr			currentFilter;
+	filterPtr			currentDisplayFilter;
+	macroPtr			currentMacro;
+	imgPtr				currentBase;
+	imgPtr				sourceImg;
     cv::Mat				curImg;
     cv::Mat				orgImg; // Only used for resetting everything when all the filters have been deleted
     cv::Mat				tmpOutput;
@@ -82,7 +84,7 @@ private:
     QPoint				cropEnd;
     int					currentFilterIdx;
 	QList<filterMacro*> macros;
-	
+	QList<filterPtr>	savedFilters;
 };
 
 

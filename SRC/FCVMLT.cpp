@@ -6,8 +6,7 @@ container::container(QTreeWidget *parent) :
 	isData(false),
 	isTop(false),
 	saved(false),
-	cached(false),
-	parentContainer(NULL)
+	cached(false)
 {
 	type = Display;
 	//updateDisplay();
@@ -22,10 +21,7 @@ container::container(QTreeWidgetItem* parent) :
 }
 container::~container()
 {
-	for (unsigned int i = 0; i < childCount(); ++i)
-	{
-		removeChild((child(i)));
-	}
+	childContainers.clear();
 }
 bool 
 container::load()
@@ -35,12 +31,73 @@ container::load()
 bool
 container::save()
 {
+	
+
 	return true;
 }
 void 
 container::updateDisplay()
 {
 	setText(0, baseName);
+}
+containerPtr
+container::getChild(QString name)
+{
+	for (int i = 0; i < childContainers.size(); ++i)
+	{
+		if (childContainers[i]->name == name)
+		{
+			return childContainers[i];
+		}
+		containerPtr child = childContainers[i]->getChild(name);
+		if (child != NULL) return child;
+	}
+	return containerPtr();
+}
+containerPtr
+container::getChild(container* ptr)
+{
+	for (int i = 0; i < childContainers.size(); ++i)
+	{
+		if (childContainers[i].get() == ptr)
+		{
+			return childContainers[i];
+		}
+		containerPtr child = childContainers[i]->getChild(ptr);
+		if (child != NULL) return child;
+	}
+	return containerPtr();
+}
+bool
+container::deleteChild(QString name)
+{
+	for (int i = 0; i < childContainers.size(); ++i)
+	{
+		if (childContainers[i]->name == name)
+		{
+			childContainers.removeAt(i);
+			return true;
+		}
+		if (childContainers[i]->deleteChild(name)) return true;
+	}
+	return false;
+}
+bool
+container::deleteChild(container* ptr)
+{
+	for (int i = 0; i < childContainers.size(); ++i)
+	{
+		if (childContainers[i].get() == ptr)
+		{
+			childContainers.removeAt(i);
+			return true;
+		}
+		if (childContainers[i]->deleteChild(ptr))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 // ************************************************ matrixContainer ***************************************
 matrixContainer::matrixContainer(QTreeWidget* parent) :
@@ -109,10 +166,10 @@ processingContainer::~processingContainer()
 {
 
 }
-container* 
+containerPtr
 processingContainer::getDisplayCopy()
 {
-	processingContainer* out = new processingContainer(this);
+	containerPtr out(new processingContainer(this));
 	return out;
 }
 QWidget* 
@@ -126,7 +183,7 @@ processingContainer::getParamControlWidget(QWidget* parent)
 		layout->addWidget(label, i, 0);
 		if (parameters[i].type == t_char)
 		{
-			QSpinBox* box = new QSpinBox;
+			QSpinBox* box = new QSpinBox(out);
 			box->setMinimum(0);
 			box->setMaximum(255);
 			box->setObjectName(parameters[i].name);
@@ -137,7 +194,7 @@ processingContainer::getParamControlWidget(QWidget* parent)
 		}
 		if (parameters[i].type == t_float)
 		{
-			QDoubleSpinBox* box = new QDoubleSpinBox;
+			QDoubleSpinBox* box = new QDoubleSpinBox(out);
 			box->setObjectName(parameters[i].name);
 			box->setValue(parameters[i].value);
 			box->setMinimum(parameters[i].minVal);
@@ -150,7 +207,7 @@ processingContainer::getParamControlWidget(QWidget* parent)
 		}
 		if (parameters[i].type == t_double)
 		{
-			QDoubleSpinBox* box = new QDoubleSpinBox;
+			QDoubleSpinBox* box = new QDoubleSpinBox(out);
 			box->setObjectName(parameters[i].name);
 			box->setValue(parameters[i].value);
 			box->setMinimum(parameters[i].minVal);
@@ -160,11 +217,10 @@ processingContainer::getParamControlWidget(QWidget* parent)
 			parameters[i].box = box;
 			layout->addWidget(box, i, 1);
 			connect(box, SIGNAL(valueChanged(QString)), this, SLOT(handleParamChange(QString)));
-
 		}
 		if (parameters[i].type == t_int)
 		{
-			QSpinBox* box = new QSpinBox;
+			QSpinBox* box = new QSpinBox(out);
 			box->setObjectName(parameters[i].name);
 			box->setValue(parameters[i].value);
 			layout->addWidget(box, i, 1);
@@ -173,11 +229,10 @@ processingContainer::getParamControlWidget(QWidget* parent)
 			box->setValue(parameters[i].value);
 			parameters[i].box = box;
 			connect(box, SIGNAL(valueChanged(QString)), this, SLOT(handleParamChange(QString)));
-
 		}
 		if (parameters[i].type == t_pullDown)
 		{
-			QComboBox* box = new QComboBox;
+			QComboBox* box = new QComboBox(out);
 			box->setObjectName(parameters[i].name);
 			box->setToolTip(parameters[i].toolTip);
 			layout->addWidget(box, i, 1);
@@ -186,8 +241,8 @@ processingContainer::getParamControlWidget(QWidget* parent)
 			connect(box, SIGNAL(currentIndexChanged(QString)), this, SLOT(handleParamChange(QString)));
 		}
 	}
-	QPushButton* accept = new QPushButton;
-	QPushButton* cancel = new QPushButton;
+	QPushButton* accept = new QPushButton(out);
+	QPushButton* cancel = new QPushButton(out);
 	accept->setText("Accept Changes");
 	cancel->setText("Cancel Changes");
 	layout->addWidget(accept, parameters.size(), 0);
@@ -246,17 +301,16 @@ processingContainer::update()
 
 }
 void
-processingContainer::setInput(container* cont_)
+processingContainer::setInput(containerPtr cont_)
 {
 	//input(input_);
 }
-container* 
-processingContainer::process(container* cont_)
+containerPtr
+processingContainer::process(containerPtr cont_)
 {
 	//input(input_);
-	//emit processingFinished(output);
-	container* output = new container;
-	return output;
+	//emit processingFinished(output);;
+	return containerPtr();
 }
 // ************************************************ featureExtractorContainer ***********************
 featureExtractorContainer::featureExtractorContainer(QTreeWidget* parent, statType type_):
@@ -286,12 +340,23 @@ featureExtractorContainer::featureExtractorContainer(statType type_)
 	sType = type_;
 	initialize();
 }
+featureExtractorContainer::featureExtractorContainer(featureExtractorContainer* cpy)
+{
+	sType = cpy->sType;
+	numFeatures = cpy->numFeatures;
+	numThreads = cpy->numThreads;
+	visualizableResult = cpy->visualizableResult;
+	parameters = cpy->parameters;
+	name = cpy->name;
+	saveName = cpy->saveName;
+
+}
 featureExtractorContainer::~featureExtractorContainer()
 {
 
 }
 bool 
-featureExtractorContainer::extractFeatures(cv::Mat src, cv::Mat& features, cv::Mat& dispImg)
+featureExtractorContainer::extractFeatures(cv::Mat src, cv::Mat& features, cv::Mat* dispImg)
 {
 	switch (sType)
 	{
@@ -300,7 +365,7 @@ featureExtractorContainer::extractFeatures(cv::Mat src, cv::Mat& features, cv::M
 		cv::Scalar output = cv::sum(src);
 		for (int i = 0; i < src.channels(); ++i)
 		{
-			((float*)features.data)[i] = output[i];
+			((float*)features.data)[i] = (float)output[i];
 		}
 		break;
 	}
@@ -309,8 +374,18 @@ featureExtractorContainer::extractFeatures(cv::Mat src, cv::Mat& features, cv::M
 		cv::Scalar out = cv::mean(src);
 		for (int i = 0; i < src.channels(); ++i)
 		{
-			((float*)features.data)[i] = out[i];
+			((float*)features.data)[i] = (float)out[i];
 		}
+		break;
+	}
+	case copy:
+	{
+
+		cv::Mat out; //src.reshape(src.channels(), 1);
+		src.copyTo(out);
+		out = out.reshape(src.channels(), 1);
+		if(src.channels() == 1) out.convertTo(features, CV_32F);
+		if (src.channels() == 3) out.convertTo(features, CV_32FC3);
 		break;
 	}
 	case median:
@@ -369,32 +444,32 @@ featureExtractorContainer::extractFeatures(cv::Mat src, cv::Mat& features, cv::M
 	return true;
 }
 bool
-featureExtractorContainer::extractKeyPoints(cv::Mat src, featureContainer* features, cv::Mat& dispImg)
+featureExtractorContainer::extractKeyPoints(cv::Mat src, featurePtr features, cv::Mat* dispImg)
 {
 	switch (sType)
 	{
 	case sift:
 	{
-				 cv::SIFT sift;
-				 std::vector<cv::KeyPoint> keyPts;
-				 sift(src, cv::Mat(), keyPts);
-				 features->keyPts.reserve(keyPts.size());
-				 for (int i = 0; i < keyPts.size(); ++i)
-				 {
-					 features->keyPts.push_back(keyPts[i].pt);
-				 }
-				 // Figure out how to get the sift features and put them into features->M
-				 cv::drawKeypoints(dispImg, keyPts, dispImg, cv::Scalar(255, 0, 0));
-				 break;
+        cv::SIFT sift;
+		std::vector<cv::KeyPoint> keyPts;
+		sift(src, cv::Mat(), keyPts);
+		features->keyPts.reserve(keyPts.size());
+		for (int i = 0; i < keyPts.size(); ++i)
+		{
+			features->keyPts.push_back(keyPts[i].pt);
+		}
+		// Figure out how to get the sift features and put them into features->M
+		if (dispImg != NULL)
+		cv::drawKeypoints(*dispImg, keyPts, *dispImg, cv::Scalar(255, 0, 0));
+		break;
 	}
 	case HoG:
 	{
-				break;
+		break;
 	}
 	case orb:
 	{
-
-				break;
+		break;
 	}
 	case line:
 	{
@@ -413,10 +488,13 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featureContainer* featu
 			parameters[4].value);
 		float scaleX = 1;
 		float scaleY = 1;
-		if (src.size != dispImg.size)
+		if (dispImg != NULL)
 		{
-			scaleX = dispImg.cols / src.cols;
-			scaleY = dispImg.rows / src.rows;
+			if (src.size != dispImg->size)
+			{
+				scaleX = dispImg->cols / src.cols;
+				scaleY = dispImg->rows / src.rows;
+			}
 		}
 		for (size_t i = 0; i < lines.cols; i++)
 		{
@@ -430,7 +508,8 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featureContainer* featu
 			pt1.y = cvRound(y0 + 1000 * (a))*scaleY;
 			pt2.x = cvRound(x0 - 1000 * (-b))*scaleX;
 			pt2.y = cvRound(y0 - 1000 * (a))*scaleY;
-			cv::line(dispImg, pt1, pt2, cv::Scalar(0, 0, 255), 3, CV_AA);
+			if (dispImg != NULL)
+				cv::line(*dispImg, pt1, pt2, cv::Scalar(0, 0, 255), 3, CV_AA);
 		}
 		features->M() = lines;
 		break;
@@ -457,7 +536,8 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featureContainer* featu
 			p1.y = line.val[1];
 			p2.x = line.val[2];
 			p2.y = line.val[3];
-			cv::line(dispImg, p1, p2, cv::Scalar(0, 0, 255), 3, CV_AA);
+			if (dispImg != NULL)
+				cv::line(*dispImg, p1, p2, cv::Scalar(0, 0, 255), 3, CV_AA);
 		}
 		features->M() = lines;
 		break;
@@ -479,10 +559,13 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featureContainer* featu
 			cv::Vec3f circle = circles.at<cv::Vec3f>(i);
 			cv::Point center(cvRound(circle.val[0]), cvRound(circle.val[1]));
 			int radius = cvRound(circle.val[2]);
-			// circle center
-			cv::circle(dispImg, center, 3, cv::Scalar(0, 255, 0), -1, 8, 0);
-			// circle outline
-			cv::circle(dispImg, center, radius, cv::Scalar(0, 0, 255), 3, 8, 0);
+			if (dispImg != NULL)
+			{
+				// circle center
+				cv::circle(*dispImg, center, 3, cv::Scalar(0, 255, 0), -1, 8, 0);
+				// circle outline
+				cv::circle(*dispImg, center, radius, cv::Scalar(0, 0, 255), 3, 8, 0);
+			}
 		}
 		features->M() = circles;
 		break;
@@ -494,7 +577,7 @@ void
 featureExtractorContainer::initialize()
 {
 	name = STAT_TYPES[(int)sType];
-	isKeyPoint = false;
+	visualizableResult = false;
 	switch (sType)
 	{
 	case sum:
@@ -504,6 +587,10 @@ featureExtractorContainer::initialize()
 	case avg:
 		numFeatures = 1;
 		name = "Average";
+		break;
+	case copy:
+		numFeatures = 1;
+		name = "Copy";
 		break;
 	case median:
 		numFeatures = 1;
@@ -527,22 +614,26 @@ featureExtractorContainer::initialize()
 	case sift:
 		name = "Scale invariant feature transform";
 		numFeatures = 128;
-		isKeyPoint = true;
+		visualizableResult = true;
 		break;
 	case HoG:
 		name = "Histogram of Gradients";
 		numFeatures = 1;
-		isKeyPoint = true;
+		visualizableResult = true;
 		break;
 	case orb:
 		name = "Orb";
 		numFeatures = 1;
-		isKeyPoint = true;
+		visualizableResult = true;
 		break;
+	case surf:
+		name = "SURF-64";
+		visualizableResult = true;
+		numFeatures = 64;
 	case line:
 		name = "Hough line detection";
 		numFeatures = 1;
-		isKeyPoint = true;
+		visualizableResult = true;
 		parameters.resize(5);
 		parameters[0] = param(t_double, 1, "Rho","",1,100000);
 		parameters[1] = param(t_double, 1, "Theta","",1,360);
@@ -553,7 +644,7 @@ featureExtractorContainer::initialize()
 	case lineP:
 		name = "Probabilistic hough line detection";
 		numFeatures = 1;
-		isKeyPoint = true;
+		visualizableResult = true;
 		parameters.resize(5);
 		parameters[0] = param(t_double, 1, "Rho","",1,100000);
 		parameters[1] = param(t_double, 1, "Theta","",1,360);
@@ -564,7 +655,7 @@ featureExtractorContainer::initialize()
 	case circle:
 		name = "Hough circle detector";
 		numFeatures = 1;
-		isKeyPoint = true;
+		visualizableResult = true;
 		parameters.resize(6);
 		//parameters[0] = param(t_pullDown,)
 		parameters[0] = param(t_double, 1, "Inverse ratio of resolution");
@@ -601,22 +692,25 @@ processingContainer(parent)
 	method = wholeImage;
 	initialize();
 }
-featureWindowContainer::featureWindowContainer(QTreeWidget* parent, statMethod method_, featureExtractorContainer* curExtractor_) :
+featureWindowContainer::featureWindowContainer(QTreeWidget* parent, statMethod method_, featureExtractorPtr curExtractor_) :
 processingContainer(parent)
 {
+	curExtractor = curExtractor_;
 	type = FeatureWindow;
 	method = method_;
 	initialize();
 }
-featureWindowContainer::featureWindowContainer(QTreeWidgetItem* parent, statMethod method_, featureExtractorContainer* curExtractor_) :
+featureWindowContainer::featureWindowContainer(QTreeWidgetItem* parent, statMethod method_, featureExtractorPtr curExtractor_) :
 processingContainer(parent)
 {
+	curExtractor = curExtractor_;
 	type = FeatureWindow;
 	method = method_;
 	initialize();
 }
-featureWindowContainer::featureWindowContainer(statMethod method_, featureExtractorContainer* curExtractor_)
+featureWindowContainer::featureWindowContainer(statMethod method_, featureExtractorPtr curExtractor_)
 {
+	curExtractor = curExtractor_;
 	type = FeatureWindow;
 	method = method_;
 	initialize();
@@ -627,11 +721,15 @@ featureWindowContainer::featureWindowContainer(statMethod method_)
 	method = method_;
 	initialize();
 }
+featureWindowContainer::featureWindowContainer(featureWindowContainer* cpy)
+{
+	type = FeatureWindow;
+	method = cpy->method;
+	parameters = cpy->parameters;
+}
 void						
 featureWindowContainer::initialize()
 {
-	curExtractor = NULL;
-	curSource = NULL;
 	switch (method)
 	{
 	case wholeImage:
@@ -642,6 +740,11 @@ featureWindowContainer::initialize()
 		break;
 	case superPixel:
 		name = "Super Pixel";
+		parameters.resize(4);
+		parameters[0] = param(t_int, 1, "Width");
+		parameters[1] = param(t_int, 1, "Height");
+		parameters[2] = param(t_int, 1, "Step X");
+		parameters[3] = param(t_int, 1, "Step Y");
 		break;
 	case perPixel:
 		name = "Per Pixel";
@@ -651,80 +754,144 @@ featureWindowContainer::initialize()
 		break;
 	}
 }
-featureContainer* 
-featureWindowContainer::extractFeatures(imgContainer* src, cv::Mat &displayImg, featureExtractorContainer* curExtractor_)
+// Workhorse of this object.
+// Based on the extraction method, this function extracts regions of interest and passes those regions to the feature extractor
+// it also attemtps to initialize the feature output matrix so that it is only initialized once, then passes the output and an index
+// to the feature extractor.
+featurePtr
+featureWindowContainer::extractFeatures()
 {
-	if (curExtractor_ == NULL) return NULL;
-	if (src == NULL) return NULL;
-	if (src->M().empty()) return NULL;
-	if (curExtractor != NULL) disconnect(curExtractor, SIGNAL(updated()));
-	connect(curExtractor_, SIGNAL(updated()), this, SLOT(handleExtractorUpdate()));
-	curExtractor = curExtractor_;
-	curSource = src;
-	dispImg = displayImg;
-	//img = cv::Mat(); // Make empty image
+	if (curExtractor == NULL) featurePtr();
+	if (curSource == NULL)featurePtr();
+	if (curSource->M().empty()) featurePtr();
+	if (curExtractor != NULL) disconnect(curExtractor.get(), SIGNAL(updated()));
+	connect(curExtractor.get(), SIGNAL(updated()), this, SLOT(handleExtractorUpdate()));
+
 	boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
-	featureContainer* output = new featureContainer();
-	if (curExtractor_->isKeyPoint && displayImg.empty())
+	featurePtr output(new featureContainer());
+	output->dirName = curSource->dirName;
+	output->baseName = curSource->baseName;
+	cv::Mat* disp = NULL;
+	if (curExtractor->visualizableResult)
 	{
-		src->M().copyTo(displayImg);
+		if (dispImg.empty())
+			curSource->M().copyTo(dispImg);
+		disp = &dispImg;
 	}
 	if (method == wholeImage)
 	{
-		// Need to initialize the size of output inside this function so that it can be done once
-		output->M() = cv::Mat::zeros(1, curExtractor_->numFeatures * src->M().channels(), CV_32F);
-		if (curExtractor_->isKeyPoint)
-			if (!curExtractor_->extractKeyPoints(src->M(), output, displayImg)) return NULL;
-		else
-			if (!curExtractor_->extractFeatures(src->M(), output->M(), displayImg)) return NULL;
+		output->M() = cv::Mat::zeros(1, curExtractor->numFeatures * curSource->M().channels(), CV_32F);
+		if (curExtractor->visualizableResult)
+		{
+			// Pass display image in so that it can be updated by the extractor
+			if (!curExtractor->extractKeyPoints(curSource->M(), output, disp))
+			{
+				return featurePtr();
+			}
+			else
+			{
+				if (!curExtractor->extractFeatures(curSource->M(), output->M(), disp))
+				{
+					return featurePtr();
+				}
+			}
+		}else
+		{
+			
+			if (!curExtractor->extractFeatures(curSource->M(), output->M()))
+			{
+				return featurePtr();
+			}
+		}
 	}
+	
 	if (method == ROI)
 	{
-		src->M() = src->M()(cv::Rect(parameters[0].value, parameters[1].value, parameters[2].value, parameters[3].value));
-		output->M() = cv::Mat::zeros(1, curExtractor_->numFeatures * src->M().channels(), CV_32F);
+		cv::Mat M = curSource->M()(cv::Rect(parameters[0].value, parameters[1].value, parameters[2].value, parameters[3].value));
+		output->_M = cv::Mat::zeros(1, curExtractor->numFeatures * curSource->M().channels(), CV_32F);
 		// Replace displayImg with the same ROI from the source image, so that key display is copied back to the right image location
-		if (curExtractor_->isKeyPoint)
-		if (!curExtractor_->extractKeyPoints(src->M(), output, displayImg)) return NULL;
-		else
-		if (!curExtractor_->extractFeatures(src->M(), output->M(), displayImg)) return NULL;
+		if (curExtractor->visualizableResult)
+		{
+			if (!curExtractor->extractKeyPoints(M, output, disp))
+			{
+				return featurePtr();
+			}
+			else
+			{
+				if (!curExtractor->extractFeatures(M, output->M(), disp))
+				{
+					return featurePtr();
+				}
+			}
+		}
+		
 	}
+	
+	
 	if (method == superPixel)
 	{
-		int stepsX = (src->M().cols - parameters[0].value) / parameters[2].value;
-		int stepsY = (src->M().rows - parameters[1].value) / parameters[3].value;
+		int stepsX = (curSource->M().cols - parameters[0].value) / parameters[2].value;
+		int stepsY = (curSource->M().rows - parameters[1].value) / parameters[3].value;
 		// 0 - width, 1 - height, 2 - stepX, 3 - step y
 		if (parameters[0].value == -1)
 		{
 			// Calculate strips along the width of the image
 			stepsX = 1;
-			parameters[0].value = src->M().cols;
+			parameters[0].value = curSource->M().cols;
 		}
 		if (parameters[1].value == -1)
 		{
 			// Calculate strips along the height of the image
 			stepsY = 1;
-			parameters[1].value = src->M().rows;
+			parameters[1].value = curSource->M().rows;
 		}
-		if (src->M().channels() == 1)
-			output->M() = cv::Mat::zeros(stepsY, stepsX*curExtractor_->numFeatures, CV_32F);
+		int rows = stepsY*stepsX;
+		bool useMask = false;
+		if (mask.size() == curSource->M().size())
+		{
+			rows = cv::countNonZero(mask);
+			useMask = true;
+		}
+		int numFeatures = curExtractor->numFeatures;
+		if (curExtractor->sType == copy) numFeatures = parameters[0].value * parameters[1].value;
+		if (curSource->M().channels() == 1)
+		{
+			output->_M = cv::Mat::zeros(rows, numFeatures, CV_32F);
+		}
 		else
-			output->M() = cv::Mat::zeros(stepsY, stepsX*curExtractor_->numFeatures, CV_32FC3);
+		{
+			output->_M = cv::Mat::zeros(rows, numFeatures, CV_32FC3);
+			//dispImg = cv::Mat::zeros(stepsY, stepsX, CV_32FC3);
+		}
+		unsigned int featureRowCount = 0;
 		for (int i = 0; i < stepsY; ++i)
 		{
 			for (int j = 0; j < stepsX; ++j)
 			{
-				if (j * parameters[2].value + parameters[0].value > src->M().cols)
+				if (useMask)
+				{
+					if (mask.at<uchar>(i, j) == 0) continue;
+				}
+				if (j * parameters[2].value + parameters[0].value > curSource->M().cols)
 					break;
-				if (i * parameters[3].value + parameters[1].value > src->M().rows)
+				if (i * parameters[3].value + parameters[1].value > curSource->M().rows)
 					break;
-				cv::Mat roi = src->M()(cv::Rect(j * parameters[2].value,
+				cv::Mat roi = curSource->M()(cv::Rect(j * parameters[2].value,
 					i * parameters[3].value,
 					parameters[0].value,
-					parameters[1].value) );
-				//curExtractor_->extractFeatures(roi, output->M(cv::Rect(j * curExtractor_->numFeatures, i, curExtractor_->numFeatures, 1)));
+					parameters[1].value));
+				cv::Mat tmp = output->_M;
+				curExtractor->extractFeatures(roi, output->_M.row(featureRowCount));
+				++featureRowCount;
 			}
 		}
+		if (useMask == false)
+		{
+			dispImg = output->_M.reshape(curSource->M().channels(), stepsY);
+			emit displayImage(dispImg);
+		}
 	}
+	/*
 	if (method == perPixel)
 	{
 
@@ -733,33 +900,91 @@ featureWindowContainer::extractFeatures(imgContainer* src, cv::Mat &displayImg, 
 	{
 
 	}
+	if (method == mask)
+	{
+
+	}
+	*/
 	boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
 	boost::posix_time::time_duration delta = end - start;
-	emit log(curExtractor_->name + " extraction took " + QString::number(delta.total_milliseconds()) + " milliseconds", 1);
+	emit log(curExtractor->name + " extraction took " + QString::number(delta.total_milliseconds()) + " milliseconds", 1);
 	return output;
+}
+featurePtr
+featureWindowContainer::extractFeatures(imgPtr src)
+{
+	curSource = src;
+	return extractFeatures();
+}
+featurePtr
+featureWindowContainer::extractFeatures(imgPtr src, cv::Mat mask_)
+{
+	curSource = src;
+	mask = mask_;
+	return extractFeatures();
+}
+featurePtr
+featureWindowContainer::extractFeatures(imgPtr src, cv::Mat mask_, cv::Mat& displayImg)
+{
+	mask = mask_;
+	curSource = src;
+	dispImg = displayImg;
+	return extractFeatures();
+}
+featurePtr
+featureWindowContainer::extractFeatures(imgPtr src, cv::Mat mask_, cv::Mat& displayImg, featureExtractorPtr curExtractor_)
+{
+	mask = mask_;
+	curSource = src;
+	dispImg = displayImg;
+	curExtractor = curExtractor_;
+	return extractFeatures();
+}
+void
+featureWindowContainer::setSrc(imgPtr src)
+{
+	curSource = src;
+}
+void
+featureWindowContainer::setMask(cv::Mat mask_)
+{
+	mask = mask_;
+}
+void
+featureWindowContainer::setExtractor(featureExtractorPtr curExtractor_)
+{
+	curExtractor = curExtractor_;
+}
+void
+featureWindowContainer::setDisplayImage(imgPtr img)
+{
+	dispImg = img->M();
 }
 void
 featureWindowContainer::handleExtractorUpdate()
 {
-	featureContainer* f = extractFeatures(curSource, dispImg, curExtractor);
-	emit displayImage(dispImg);
-	emit extractedFeatures(f);
+	//featureContainer* f = extractFeatures(curSource, dispImg, curExtractor);
+	//emit displayImage(dispImg);
+	//emit extractedFeatures(f);
 }
 // ************************************************ imgContainer ***************************************
 imgContainer::imgContainer(QTreeWidget* parent) :
 	matrixContainer(parent)
 {
+	parentContainer = NULL;
 	mask = false;
 	type = Img;
 }
 imgContainer::imgContainer(QTreeWidgetItem* parent) :
 	matrixContainer(parent)
 {
+	parentContainer = NULL;
 	type = Img;
 	mask = false;
 }
 imgContainer::imgContainer(imgContainer* cpy)
 {
+	parentContainer = NULL;
 	mask = false;
 	type = Img;
 	cpy->M().copyTo(_M);
@@ -768,6 +993,7 @@ imgContainer::imgContainer(imgContainer* cpy)
 imgContainer::imgContainer(QString absFilePath, QTreeWidget* parent):
 	matrixContainer(parent)
 {
+	parentContainer = NULL;
 	type = Img;
 	name = "Source";
 	QFileInfo file(absFilePath);
@@ -787,6 +1013,7 @@ imgContainer::imgContainer(QString absFilePath, QTreeWidget* parent):
 imgContainer::imgContainer(QString absFilePath, imgContainer* parent):
 	matrixContainer((QTreeWidgetItem*)parent)
 {
+	parentContainer = NULL;
 	type = Img;
 	baseName = parent->baseName;
 	QFileInfo file(absFilePath);
@@ -802,7 +1029,7 @@ imgContainer::imgContainer(QString absFilePath, imgContainer* parent):
 }
 imgContainer::~imgContainer()
 {
-
+	childContainers.clear();
 }
 bool 
 imgContainer::load()
@@ -814,12 +1041,16 @@ imgContainer::load()
 		{
 			if (filePath.endsWith("dcm", Qt::CaseInsensitive))
 			{
+#ifdef DICOM_LOADER_FOUND
 				_M = readDCM(filePath.toStdString());
+#else
+#endif
 				//tmp.convertTo(_M, CV_32F);
 			}else
 			{
 				if (type == container::Img)
 					_M = cv::imread(filePath.toStdString());
+				cv::Mat tmp = _M;
 				if (type == container::Label)
 					_M = cv::imread(filePath.toStdString(), 0);
 			}
@@ -838,9 +1069,6 @@ bool
 imgContainer::save()
 {
 	if (_M.empty()) return false;
-	//QString dir = dynamic_cast<container*>(orig->parent())->dirName;
-	//QString baseName = dynamic_cast<container*>(orig->parent())->baseName;
-	QDir dir(dirName);
 	if (!QDir(dirName).exists())
 	{
 		// Processing directory doesn't exist, need to make it.
@@ -876,10 +1104,12 @@ imgContainer::loadChild(QString dirName_, QString absFileName_)
 {
 	if (dirName_ == "labels")
 	{
-		labelContainer* child = new labelContainer(absFileName_, baseName, this);
+		containerPtr child(new labelContainer(absFileName_, baseName, this));
+		childContainers.push_back(child);
 	}else
 	{
-		imgContainer* tmp = new imgContainer(absFileName_, this);
+		containerPtr tmp(new imgContainer(absFileName_, this));
+		childContainers.push_back(tmp);
 	}
 	return true;
 }
@@ -958,13 +1188,13 @@ labelContainer::labelContainer(QTreeWidgetItem* parent) :
 {
 	type = Label;
 }
-labelContainer::labelContainer(QString absFilePath, QString parentName, QTreeWidgetItem* parent):
+labelContainer::labelContainer(QString absFilePath, QString parentName, QTreeWidgetItem* parent) :
 	imgContainer(parent)
 {
 	baseName = parentName;
 	QFileInfo file(absFilePath);
 	type = Label;
-	name = "Label";
+	//name = "Label";
 	isTop = false;
 	label = -2;
 	if (file.exists())
@@ -972,10 +1202,29 @@ labelContainer::labelContainer(QString absFilePath, QString parentName, QTreeWid
 		QString lblName = file.baseName();
 		filePath = file.absoluteFilePath(); 
 		dirName = file.absolutePath();
-		QString txtLabel = lblName.mid(parentName.size() + 1, lblName.size() - parentName.size());
-		label = txtLabel.toInt();
-		setText(0, txtLabel + " mask");
-		setText(1, txtLabel);
+		if (lblName.contains("positive") || lblName.contains("Pos"))
+		{
+			label = 1;
+			setText(0, "positive mask");
+			setText(1, "1");
+			name = "positive mask";
+		}else
+		{
+			if (lblName.contains("negative") || lblName.contains("Neg"))
+			{
+				label = -1;
+				setText(0, "negative mask");
+				setText(1, "-1");
+				name = "negative mask";
+			}else
+			{
+				QString txtLabel = lblName.mid(parentName.size() + 1, lblName.size() - parentName.size());
+				label = txtLabel.toInt();
+				setText(0, txtLabel + " mask");
+				setText(1, txtLabel);
+				name = txtLabel + " mask";
+			}
+		}
 		parent->addChild(this);
 	}
 	QFileInfo polyFile(absFilePath.mid(0, absFilePath.size() - 4) + ".yml");
@@ -983,6 +1232,10 @@ labelContainer::labelContainer(QString absFilePath, QString parentName, QTreeWid
 	{
 		cv::FileStorage fs(polyFile.absoluteFilePath().toStdString(), cv::FileStorage::READ);
 		int polys = (int)fs["polygons"];
+		className = QString::fromStdString((std::string)fs["ClassName"]);
+		label = (int)fs["ClassNumber"];
+		setText(0, className + " mask");
+		name = className + " mask";
 		polygons.reserve(polys);
 		for (int i = 0; i < polys; ++i)
 		{
@@ -1018,7 +1271,9 @@ labelContainer::save()
 {
 	cv::imwrite((dirName + "/" + baseName + "-" + QString::number(label) + ".jpg").toStdString(), _M);
 	cv::FileStorage fs((dirName + "/" + baseName + "-" + QString::number(label)+ ".yml").toStdString(), cv::FileStorage::WRITE);
+	fs << "ClassName" << className.toStdString();
 	fs << "polygons" << polygons.size();
+	fs << "ClassNumber" << label;
 	for (int i = 0; i < polygons.size(); ++i)
 	{
 		fs << ("Polygon-" + QString::number(i).toStdString()) << "[";
@@ -1047,11 +1302,26 @@ featureContainer::~featureContainer()
 {
 
 }
+bool
+featureContainer::save()
+{
+	if (!QDir(dirName + "/Features/").exists())
+	{
+		// Processing directory doesn't exist, need to make it.
+		QDir().mkdir(dirName + "/Features/");
+	}
+	QString saveName = dirName + "/Features/" + baseName + "_" + text(0) + ".xml";
+	cv::FileStorage fs;
+	fs.open(saveName.toStdString(), cv::FileStorage::WRITE);
+	fs << "name" << name.toStdString();
+	fs << "matrix" << _M;
+	fs << "KeyPoints" << keyPts;
+	fs << "label" << label;
+	return true;
+}
 // *********************** filterContainer **************************
 filterContainer::filterContainer(QTreeWidget* parent, filterType type_):
-	processingContainer(parent),
-	filterParent(NULL),
-	filterChild(NULL)
+	processingContainer(parent)
 	//output(NULL)
 {
 	type = Filter;
@@ -1059,18 +1329,14 @@ filterContainer::filterContainer(QTreeWidget* parent, filterType type_):
 	initialize();
 }
 filterContainer::filterContainer(QTreeWidgetItem* parent, filterType type_):
-	processingContainer(parent),
-	filterParent(NULL),
-	filterChild(NULL)
+	processingContainer(parent)
 	//output(NULL)
 {
 	type = Filter;
 	fType = type_;
 	initialize();
 }
-filterContainer::filterContainer(filterType type_):
-	filterParent(NULL),
-	filterChild(NULL)
+filterContainer::filterContainer(filterType type_)
 	//output(NULL)
 {
 	type = Filter;
@@ -1078,10 +1344,7 @@ filterContainer::filterContainer(filterType type_):
 //	output = NULL;
 	initialize();
 }
-filterContainer::filterContainer(cv::FileNode& node):
-	filterParent(NULL),
-	filterChild(NULL)
-	//output(NULL)
+filterContainer::filterContainer(cv::FileNode& node)
 {
 	type = Filter;
 	name = QString::fromStdString((std::string)node["FilterName"]);
@@ -1134,11 +1397,11 @@ filterContainer::~filterContainer()
 {
 
 }
-container*
+filterPtr
 filterContainer::getDisplayCopy()
 {
 	// Use copy constructor to copy parameters
-	filterContainer* out = new filterContainer(this);
+	filterPtr out(new filterContainer(this));
 	out->makeDisplayCopy();
 	//_M.copyTo(out->_M);
 	out->_M = _M.clone();
@@ -1146,18 +1409,8 @@ filterContainer::getDisplayCopy()
 	{
 		out->baseNames << input->name;
 		out->input = input;
-	}else
-	{
-		input = NULL;
 	}
-/*	if (output != NULL)
-	{
-		out->output = new imgContainer((imgContainer*)output);
-	}else
-	{
-		out->output = NULL;
-	}*/
-
+	out->output = output;
 	return out;
 }
 void
@@ -1178,7 +1431,6 @@ filterContainer::makeDisplayCopy()
 void
 filterContainer::initialize()
 {
-	input = NULL;
 	name = FILTER_NAMES[(int)fType];
 	if (fType == threshold)
 	{
@@ -1258,6 +1510,16 @@ filterContainer::initialize()
 		numParameters = 0;
 		parameters.resize(numParameters);
 	}
+	if (fType == HSV)
+	{
+		numParameters = 1;
+		parameters.resize(numParameters);
+		QStringList names;
+		names << "Hue";
+		names << "Saturation";
+		names << "Value";
+		parameters[0] = param(t_pullDown, 0, "Desired Plane", names);
+	}
 	if (fType == HSV_hue)
 	{
 		numParameters = 0;
@@ -1336,6 +1598,11 @@ filterContainer::initialize()
 		method << "Link Runs";
 		parameters[3] = param(t_pullDown, 0, "Approximation method", method);
 	}
+	if (fType == nonMaxSuppress)
+	{
+		parameters.resize(1);
+		parameters[0] = param(t_float, 0.8, "% of max", "", 0, 1);
+	}
 }
 void			
 filterContainer::writeSettingsXML(cv::FileStorage& fs)
@@ -1363,20 +1630,30 @@ filterContainer::update()
 	//emit processingFinished(process(input));
 }
 void 
-filterContainer::setInput(container* cont_)
+filterContainer::setInput(containerPtr cont_)
 {
 	input = cont_;
 }
-imgContainer*
-filterContainer::process(container* cont_)
+containerPtr
+filterContainer::process(containerPtr cont_)
 {
-	if (cont_ == NULL) return NULL;
-	if (cont_->type != container::Img) return NULL;
-	input = cont_;
-	imgContainer* I = dynamic_cast<imgContainer*>(cont_);
-	if (output != NULL && output != cont_) delete output;
-	output = new imgContainer;
-	imgContainer* output;
+	if (cont_ == NULL) return containerPtr();
+	if (cont_->type != container::Img) return containerPtr();
+	// Attempts to de-allocate previous input.  Is this the desired functionality?
+	//input = cont_; 
+	imgPtr I = boost::dynamic_pointer_cast<imgContainer,container>(cont_);
+	if (output != NULL && output != cont_)
+	{
+		//delete output;
+	}
+	if (output == NULL)
+	{
+		output.reset(new imgContainer);
+	}
+	output->baseName = cont_->baseName;
+	output->dirName = cont_->dirName;
+	output->name = this->name;
+	//output = new imgContainer;
 	boost::posix_time::ptime start = boost::posix_time::microsec_clock::universal_time();
 	switch (fType)
 	{
@@ -1400,6 +1677,9 @@ filterContainer::process(container* cont_)
 		break;
 	case grey:
 		output = processGrey(I->M());
+		break;
+	case HSV:
+		output = processHSV(I->M());
 		break;
 	case HSV_hue:
 		output = processHSV_hue(I->M());
@@ -1433,21 +1713,19 @@ filterContainer::process(container* cont_)
 		break;
 	case contourFilter:
 		output = processContourFilter(I->M());
+		break;
+	case nonMaxSuppress:
+		output = processNonMaxSuppress(I->M());
+		break;
 	}
 	boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
 	boost::posix_time::time_duration delta = end - start;
 	emit log(name + " processing took " + QString::number(delta.total_milliseconds()) + " milliseconds", 1);
-	if (output == NULL) return NULL;
-	_M = static_cast<imgContainer*>(output)->_M;
+	if (output == NULL) return containerPtr();
+	_M = output->_M;
 	return output;
 }
-imgContainer*
-filterContainer::process()
-{
-	if (input == NULL) return NULL;
-	return process(input);
-}
-imgContainer*		
+imgPtr
 filterContainer::processThreshold(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1457,7 +1735,7 @@ filterContainer::processThreshold(cv::Mat img)
 	return output;
 }
 
-imgContainer*
+imgPtr
 filterContainer::processErode(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1470,7 +1748,7 @@ filterContainer::processErode(cv::Mat img)
 	output->_M = tmp;
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processDilate(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1482,7 +1760,7 @@ filterContainer::processDilate(cv::Mat img)
 	output->_M = tmp;
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processSobel(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1513,19 +1791,19 @@ filterContainer::processSobel(cv::Mat img)
 	}
 	if (parameters[4].value == 0)
 	{
-		((imgContainer*)output)->_M = grad_x;
+		output->_M = grad_x;
 	}
 	if (parameters[4].value == 1)
 	{
-		((imgContainer*)output)->_M = grad_y;
+		output->_M = grad_y;
 	}
 	if (parameters[4].value == 2)
 	{
-		cv::addWeighted(grad_x, 0.5, grad_y, 0.5, 0, ((imgContainer*)output)->_M);
+		cv::addWeighted(grad_x, 0.5, grad_y, 0.5, 0, output->_M);
 	}
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processSmooth(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1535,7 +1813,7 @@ filterContainer::processSmooth(cv::Mat img)
 	{
 		try
 		{
-			cv::GaussianBlur(img, ((imgContainer*)output)->_M, cv::Size(parameters[1].value, parameters[2].value), parameters[3].value, parameters[4].value);
+			cv::GaussianBlur(img, output->_M, cv::Size(parameters[1].value, parameters[2].value), parameters[3].value, parameters[4].value);
 		}
 		catch (cv::Exception &e)
 		{
@@ -1547,7 +1825,7 @@ filterContainer::processSmooth(cv::Mat img)
 		// Blur no scale
 		try
 		{
-			cv::blur(img, ((imgContainer*)output)->_M, cv::Size(parameters[1].value, parameters[2].value));
+			cv::blur(img, output->_M, cv::Size(parameters[1].value, parameters[2].value));
 		}
 		catch (cv::Exception &e)
 		{
@@ -1559,7 +1837,7 @@ filterContainer::processSmooth(cv::Mat img)
 		// Blur
 		try
 		{
-			cv::blur(img, ((imgContainer*)output)->_M, cv::Size(parameters[1].value, parameters[2].value));
+			cv::blur(img, output->_M, cv::Size(parameters[1].value, parameters[2].value));
 		}
 		catch (cv::Exception &e)
 		{
@@ -1571,7 +1849,7 @@ filterContainer::processSmooth(cv::Mat img)
 		// Median
 		try
 		{
-			cv::medianBlur(img, ((imgContainer*)output)->_M, parameters[1].value);
+			cv::medianBlur(img, output->_M, parameters[1].value);
 		}
 		catch (cv::Exception &e)
 		{
@@ -1584,7 +1862,7 @@ filterContainer::processSmooth(cv::Mat img)
 		// Bilateral
 		try
 		{
-			cv::bilateralFilter(img, ((imgContainer*)output)->_M, parameters[1].value, parameters[3].value, parameters[4].value);
+			cv::bilateralFilter(img, output->_M, parameters[1].value, parameters[3].value, parameters[4].value);
 		}
 		catch (cv::Exception &e)
 		{
@@ -1604,7 +1882,7 @@ filterContainer::processSmooth(cv::Mat img)
 	}
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processGabor(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1613,19 +1891,19 @@ filterContainer::processGabor(cv::Mat img)
 	cv::Mat grey = img;
 	if (img.type() == CV_8UC3)
 		cv::cvtColor(grey, grey, CV_BGR2GRAY);
-	cv::filter2D(grey, ((imgContainer*)output)->_M, CV_32F, filter);
-	cv::convertScaleAbs(((imgContainer*)output)->_M, ((imgContainer*)output)->_M);
-	((imgContainer*)output)->_M.convertTo(((imgContainer*)output)->_M, CV_8U, 255);
+	cv::filter2D(grey, output->_M, CV_32F, filter);
+	cv::convertScaleAbs(output->_M, output->_M);
+	output->_M.convertTo(output->_M, CV_8U, 255);
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processResize(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
-	cv::resize(img, ((imgContainer*)output)->_M, cv::Size(parameters[0].value, parameters[1].value));
+	cv::resize(img, output->_M, cv::Size(parameters[0].value, parameters[1].value));
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processCrop(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1633,7 +1911,7 @@ filterContainer::processCrop(cv::Mat img)
 		parameters[2].value, parameters[3].value);
 	try
 	{
-		((imgContainer*)output)->_M = img(ROI);
+		output->_M = img(ROI);
 	}
 	catch (cv::Exception &e)
 	{
@@ -1642,35 +1920,52 @@ filterContainer::processCrop(cv::Mat img)
 	emit log("Cropped image to " + QString::number(ROI.height) + " " + QString::number(ROI.width), 0);
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processGrey(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
 	if (img.channels() == 1)
 	{
 		std::cout << "Img already grey!";
-		((imgContainer*)output)->_M = img;
+		output->_M = img;
 	}
 	else
 	{
-		cv::cvtColor(img, ((imgContainer*)output)->_M, CV_RGB2GRAY);
+		cv::cvtColor(img, output->_M, CV_RGB2GRAY);
 		//std::cout << output->M().type() << std::endl;
 	}
 	return output;
 }
-imgContainer*
+imgPtr
+filterContainer::processHSV(cv::Mat img)
+{
+	if (img.channels() == 1)
+	{
+		std::cout << "Cannot convert single channel image";
+		return imgPtr();
+	}
+	else
+	{
+		cv::Mat tmp;
+		cv::cvtColor(img, tmp, CV_BGR2HSV);
+		std::vector<cv::Mat> planes;
+		cv::split(tmp, planes);
+		output->_M = planes[parameters[0].value];
+		return output;
+	}
+}
+imgPtr
 filterContainer::processHSV_hue(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
 	if (img.channels() == 1)
 	{
 		std::cout << "Cannot convert single channel image";
-		return NULL;
+		return imgPtr();
 	}
 	else
 	{
 		cv::Mat tmp;
-		imgContainer* output = new imgContainer;
 		cv::cvtColor(img, tmp, CV_BGR2HSV);
 		std::vector<cv::Mat> planes;
 		cv::split(tmp, planes);
@@ -1678,18 +1973,17 @@ filterContainer::processHSV_hue(cv::Mat img)
 		return output;
 	}
 }
-imgContainer*
+imgPtr
 filterContainer::processHSV_sat(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
 	if (img.channels() == 1)
 	{
 		std::cout << "Cannot convert single channel image";
-		return NULL;
+		return imgPtr();
 	}
 	else
 	{
-		imgContainer* output = new imgContainer;
 		cv::Mat tmp;
 		cv::cvtColor(img, tmp, CV_BGR2HSV);
 		std::vector<cv::Mat> planes;
@@ -1698,18 +1992,17 @@ filterContainer::processHSV_sat(cv::Mat img)
 		return output;
 	}
 }
-imgContainer*
+imgPtr
 filterContainer::processHSV_value(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
 	if (img.channels() == 1)
 	{
 		std::cout << "Cannot convert single channel image";
-		return NULL;
+		return imgPtr();
 	}
 	else
 	{
-		imgContainer* output = new imgContainer;
 		cv::Mat tmp;
 		cv::cvtColor(img, tmp, CV_BGR2HSV);
 		std::vector<cv::Mat> planes;
@@ -1718,15 +2011,14 @@ filterContainer::processHSV_value(cv::Mat img)
 		return output;
 	}
 }
-
-imgContainer*
+imgPtr
 filterContainer::processLaplacian(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
 	try
 	{
-		cv::Laplacian(img, ((imgContainer*)output)->_M, CV_16S, parameters[2].value, parameters[0].value, parameters[1].value);
-		cv::convertScaleAbs(((imgContainer*)output)->_M, ((imgContainer*)output)->_M);
+		cv::Laplacian(img, output->_M, CV_16S, parameters[2].value, parameters[0].value, parameters[1].value);
+		cv::convertScaleAbs(output->_M, output->_M);
 	}
 	catch (cv::Exception &e)
 	{
@@ -1734,20 +2026,20 @@ filterContainer::processLaplacian(cv::Mat img)
 	}
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processPyrMeanShift(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
-	cv::pyrMeanShiftFiltering(img, ((imgContainer*)output)->_M, parameters[0].value, parameters[1].value, parameters[2].value);
+	cv::pyrMeanShiftFiltering(img, output->_M, parameters[0].value, parameters[1].value, parameters[2].value);
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processScharr(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
 	try
 	{
-		cv::Scharr(img, ((imgContainer*)output)->_M, CV_32S, parameters[0].value, parameters[1].value, parameters[2].value, parameters[3].value);
+		cv::Scharr(img, output->_M, CV_32S, parameters[0].value, parameters[1].value, parameters[2].value, parameters[3].value);
 	}
 	catch (cv::Exception &e)
 	{
@@ -1756,7 +2048,7 @@ filterContainer::processScharr(cv::Mat img)
 	
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processCanny(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1769,7 +2061,7 @@ filterContainer::processCanny(cv::Mat img)
 		}
 		try
 		{
-			cv::Canny(img, ((imgContainer*)output)->_M, parameters[0].value, parameters[1].value, parameters[2].value);
+			cv::Canny(img, output->_M, parameters[0].value, parameters[1].value, parameters[2].value);
 		}
 		catch (cv::Exception &e)
 		{
@@ -1778,7 +2070,7 @@ filterContainer::processCanny(cv::Mat img)
 	}
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processGradientOrientation(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
@@ -1789,7 +2081,7 @@ filterContainer::processGradientOrientation(cv::Mat img)
 	cv::Mat gradX, gradY;
 	cv::Sobel(img, gradX, CV_32F, 1, 0, parameters[2].value, parameters[0].value, parameters[1].value, cv::BORDER_DEFAULT);
 	cv::Sobel(img, gradY, CV_32F, 0, 1, parameters[2].value, parameters[0].value, parameters[1].value, cv::BORDER_DEFAULT);
-	((imgContainer*)output)->_M = cv::Mat::zeros(img.rows, img.cols, CV_32F);
+	output->_M = cv::Mat::zeros(img.rows, img.cols, CV_32F);
 	if (procThreads.size() != numThreads)
 		procThreads.resize(numThreads);
 	for (int i = 0; i < numThreads; ++i)
@@ -1802,17 +2094,17 @@ filterContainer::processGradientOrientation(cv::Mat img)
 	}
 	return output;
 }
-imgContainer*
+imgPtr
 filterContainer::processContourFilter(cv::Mat img)
 {
 	//imgContainer* output = new imgContainer;
 	if (img.channels() != 1)
 	{
 		log("Need to pass single channel image into contour filter", 2);
-		return NULL;
+		return imgPtr();
 	}
 	
-	std::vector<std::vector<cv::Point>> contours;
+    std::vector<std::vector<cv::Point> > contours;
 	std::vector<cv::Vec4i> hierarchy;
 	//cv::findContours(img, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_NONE);
 	try
@@ -1823,7 +2115,7 @@ filterContainer::processContourFilter(cv::Mat img)
 	{
 		std::cout << e.what() << std::endl;
 		log("Finding contours failed due to: \n " + QString::fromLocal8Bit(e.what()), 2);
-		return NULL;
+		return imgPtr();
 	}
 	
 	emit log("Found " + QString::number(contours.size()) + " individual segments", 1);
@@ -1858,6 +2150,18 @@ filterContainer::processContourFilter(cv::Mat img)
 		}
 	}
 	output->_M = img.clone();
+	return output;
+}
+imgPtr
+filterContainer::processNonMaxSuppress(cv::Mat img)
+{
+	if (img.channels() != 1)
+	{
+		cv::cvtColor(img, img, CV_BGR2GRAY);
+	}
+	double minVal, maxVal;
+	cv::minMaxIdx(img, &minVal, &maxVal);
+	output->_M = img > maxVal*parameters[0].value;
 	return output;
 }
 void 
@@ -1898,26 +2202,50 @@ statContainer::~statContainer()
 {
 
 }
+
 // *********************** mlContainer **************************
-mlContainer::mlContainer(QTreeWidget* parent):
+mlContainer::mlContainer(QTreeWidget* parent, mlType type_):
 	processingContainer(parent)
 {
-	type = ML;
+	MLType = type_;
 }
-mlContainer::mlContainer(QTreeWidgetItem* parent) :
+mlContainer::mlContainer(QTreeWidgetItem* parent, mlType type_) :
 	processingContainer(parent)
 {
-	type = ML;
+	MLType = type_;
 }
 mlContainer::~mlContainer()
 {
 
 }
-container* 
-mlContainer::process(cv::InputArray input_)
+void
+mlContainer::initialize()
 {
-	featureContainer* out = new featureContainer;
-	return out;
+	type = ML;
+	if (MLType == SVM)
+	{
+
+	}
+}
+void	
+mlContainer::train(cv::Mat features, cv::Mat labels)
+{
+
+}
+float	
+mlContainer::test(cv::Mat features, cv::Mat labels)
+{
+
+}
+bool	
+mlContainer::save()
+{
+
+}
+bool	
+mlContainer::load()
+{
+
 }
 
 // ******************************************************** filterMacro ****************************************************************
@@ -1939,7 +2267,7 @@ filterMacro::load(QString fileName)
 	for (int i = 0; i < numFilters; ++i)
 	{
 		cv::FileNode filterNode = fs["Filter-" + QString::number(i).toStdString()];
-		filterContainer* tmp = new filterContainer(filterNode);
+		filterPtr tmp( new filterContainer(filterNode) );
 		tmp->makeDisplayCopy();
 		filters.push_back(tmp);
 	}

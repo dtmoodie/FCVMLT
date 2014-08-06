@@ -1,7 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <author/>
- <comment/>
- <exportmacro/>
  <class>imgStatsWidget</class>
  <widget class="QWidget" name="imgStatsWidget">
   <property name="geometry">
@@ -15,7 +13,84 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
+  <layout class="QGridLayout" name="gridLayout_2">
+   <item row="0" column="0">
+    <layout class="QGridLayout" name="gridLayout">
+     <item row="6" column="2">
+      <widget class="QPushButton" name="view">
+       <property name="text">
+        <string>View Stat</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="2">
+      <widget class="imgDropLabel" name="input">
+       <property name="text">
+        <string>Current Input</string>
+       </property>
+      </widget>
+     </item>
+     <item row="7" column="2">
+      <widget class="QPushButton" name="save">
+       <property name="text">
+        <string>Save Stat</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Extracted Stats</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="2">
+      <widget class="imgDropLabel" name="src">
+       <property name="text">
+        <string>Current Source</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="2">
+      <widget class="QComboBox" name="windowSelect"/>
+     </item>
+     <item row="1" column="2">
+      <widget class="QComboBox" name="extractorSelect"/>
+     </item>
+     <item row="5" column="2">
+      <widget class="QPushButton" name="calc">
+       <property name="text">
+        <string>Calc Stat</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2">
+      <widget class="imgDropLabel" name="mask">
+       <property name="text">
+        <string>Current Mask</string>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0" rowspan="7">
+      <widget class="QTreeWidget" name="statHist">
+       <column>
+        <property name="text">
+         <string notr="true">1</string>
+        </property>
+       </column>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
  </widget>
- <pixmapfunction/>
+ <customwidgets>
+  <customwidget>
+   <class>imgDropLabel</class>
+   <extends>QLabel</extends>
+   <header>imageedit.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
  <connections/>
 </ui>
