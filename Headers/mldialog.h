@@ -33,7 +33,9 @@ public slots:
 	void on_back_clicked();
 	void on_cancel_clicked();
 	void updateSettingPage();
-	
+	void trainAlgorithms();
+	void buildFeatures();
+	void on_result(QString result);
 
 signals :
 	void log(QString line, int level);
@@ -45,6 +47,8 @@ private:
 	QList<mlPtr>		algorithms;
 	QList<QCheckBox*>	algorithmSelectBoxes;
 	QList<QWidget*>		currentControlWidgets;
+	cv::Mat X;
+	cv::Mat Y;
 };
 
 #endif // MLDIALOG_H

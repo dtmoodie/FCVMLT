@@ -2283,14 +2283,68 @@ mlContainer::initialize()
 	if (MLType == SVM_radialBasisKernel)
 	{
 		name = "Support Vector Machine: Radial Basis Kernel";
-		parameters.resize();
-		
+		parameters.resize(2);
+		parameters[0] = param(t_double, 0.5, "Gamma");
+		parameters[1] = param(t_double, 0.5, "nu");
 	}
 }
-void	
+float	
 mlContainer::train(cv::Mat features, cv::Mat labels)
 {
-
+	if (MLType == SVM_radialBasisKernel)
+	{
+		typedef dlib::radial_basis_kernel<sample_type> kernel_type;
+		// Restructure data to fit dlib format
+		std::vector<sample_type> X;
+		std::vector<double> Y;
+		// A matrix needs to be created that is the square of the number of features, the max size of this matrix
+		// (nc*nr) has to be smaller than a 32bit long. Thus the max number of points is sqrt(2^32-1)
+		// TODO: Fix change dlib to use 64bit ints instead of 32bit ints for storing matrix info.
+		int maxSize = std::min(65000, features.rows);
+		X.reserve(maxSize);
+		Y.reserve(maxSize);
+		for (int i = 0; i < maxSize; ++i)
+		{
+			sample_type samp;
+			samp.set_size(features.cols, 1);
+			for (int j = 0; j < features.cols; ++j)
+			{
+				samp(j) = (double)features.at<float>(i, j);
+			}
+			X.push_back(samp);
+			Y.push_back((double)labels.at<float>(i));
+		}
+		dlib::vector_normalizer<sample_type> normalizer;
+		normalizer.train(X);
+		for (int i = 0; i < X.size(); ++i)
+		{
+			X[i] = normalizer(X[i]);
+		}
+		
+		dlib::randomize_samples(X, Y);
+		const double max_nu = dlib::maximum_nu(Y);
+		dlib::svm_nu_trainer<kernel_type> trainer;
+		trainer.set_kernel(kernel_type(parameters[0].value));
+		trainer.set_nu(parameters[1].value);
+		for (double gamma = 0.00001; gamma <= 1; gamma *= 5){
+			for (double nu = 0.00001; nu < max_nu; nu *= 5){
+				trainer.set_kernel(kernel_type(gamma));
+				trainer.set_nu(nu);
+				std::cout << "Gamma: " << gamma << " nu: " << nu;
+				try{
+					dlib::matrix<double, 1, 2> score = dlib::cross_validate_trainer(trainer, X, Y, 3);
+					std::cout << " Accuracy: " << score;
+					emit results(name + " trained with gamma: " + QString::number(parameters[0].value) +
+						" nu: " + QString::number(parameters[1].value) + " score: " + QString::number(score(0)) + " / " + QString::number(score(1)));
+				}
+				catch (std::exception &e){
+					std::cout << e.what() << std::endl;
+				}
+			}
+		}
+		
+		return 0;
+	}
 }
 float	
 mlContainer::test(cv::Mat features, cv::Mat labels)

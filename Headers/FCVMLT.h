@@ -22,6 +22,9 @@
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include <dlib/svm.h>
+#include <dlib/opencv.h>
+
 #ifdef DICOM_LOADER_FOUND
 #include "subprojects/dicomLoader/dicomLoader.h"
 #endif
@@ -54,6 +57,11 @@ typedef boost::shared_ptr<featureExtractorContainer> featureExtractorPtr;
 typedef boost::shared_ptr<featureWindowContainer> featureWindowPtr;
 typedef boost::shared_ptr<statContainer> statPtr;
 typedef boost::shared_ptr<filterMacro> macroPtr;
+
+// Machine learning dlib typedefs
+
+typedef dlib::matrix<double, 0, 1> sample_type;
+
 
 enum filterType
 {
@@ -130,7 +138,7 @@ enum statType
 };
 enum mlType
 {
-	SVM_radialBasisKernel
+	SVM_radialBasisKernel = 0
 };
 struct param
 {
@@ -361,18 +369,21 @@ private:
 // Machine learning extraction technique
 class mlContainer : public processingContainer
 {
+	Q_OBJECT
 public:
-	explicit	mlContainer(QTreeWidget* parent = 0, mlType type_ = SVM);
-	explicit	mlContainer(QTreeWidgetItem* parent, mlType type_ = SVM);
+	explicit	mlContainer(QTreeWidget* parent = 0, mlType type_ = SVM_radialBasisKernel);
+	explicit	mlContainer(QTreeWidgetItem* parent, mlType type_ = SVM_radialBasisKernel);
 	explicit	mlContainer(mlType type_);
 
 				~mlContainer();
 	void		initialize();
-	void		train(cv::Mat features, cv::Mat labels);
+	float		train(cv::Mat features, cv::Mat labels);
 	float		test(cv::Mat features, cv::Mat labels);
 	bool		save();
 	bool		load();
 	mlType		MLType;
+signals:
+	void results(QString line);
 };
 // *********************** imgContainer *****************************
 class imgContainer : public matrixContainer

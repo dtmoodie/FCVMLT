@@ -38,7 +38,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 ADD_SUB_PROJECTS(${CMAKE_CURRENT_SOURCE_DIR} FCVMLT)
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/Bin/${CMAKE_BUILD_TYPE} CACHE PATH "Library output path")
 SET(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/Bin/${CMAKE_BUILD_TYPE} CACHE PATH "Executable output path")
-
+SET(DLIB_PATH $ENV{dlib_ROOT})
 set(CMAKE_AUTO_MOC ON)
 set(CMAKE_AUTOMOC_MOC_OPTIONS "-bstdafx.h" "-fstdafx.h")
 
@@ -65,9 +65,11 @@ set(BOOST_INCLUDEDIR "@Boost_INCLUDE_DIR@")
 set(BOOST_REQUIRED_MODULES system filesystem thread date_time iostreams chrono)
 set(Boost_NO_BOOST_CMAKE ON)
 find_package(Boost 1.47.0 REQUIRED COMPONENTS ${BOOST_REQUIRED_MODULES})
-find_package(Qwt)
+#find_package(Qwt)
 if(WIN32)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+
 else(WIN32)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 endif(WIN32)
@@ -100,6 +102,7 @@ INCLUDE_DIRECTORIES(${Qt5Core_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5PrintSupport_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5Widgets_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5OpenGL_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${DLIB_PATH})
 
 
 ADD_EXECUTABLE(FCVMLT 
@@ -130,11 +133,11 @@ TARGET_LINK_LIBRARIES(FCVMLT
 
 # Add test projects
 file(GLOB dirs "Test/*")
-message("Building test projects for: ")
+#message("Building test projects for: ")
 foreach(dir ${dirs})
 		if(IS_DIRECTORY ${dir})
 			if(NOT ${dir} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR}/CMakeFiles)
-				message(${dir})
+				#message(${dir})
 				#add_subdirectory(${dir})
 				#include_directories(${dir})
 				#add_subdirectory(${dir})

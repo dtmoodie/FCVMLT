@@ -40,7 +40,7 @@
      <item row="0" column="0" colspan="3">
       <widget class="QStackedWidget" name="stackedWidget">
        <property name="currentIndex">
-        <number>1</number>
+        <number>3</number>
        </property>
        <widget class="QWidget" name="featureSelectPage">
         <layout class="QGridLayout" name="gridLayout_4">
@@ -91,11 +91,7 @@
          <item row="0" column="0">
           <layout class="QGridLayout" name="gridLayout_9">
            <item row="0" column="0">
-            <widget class="QLabel" name="label_4">
-             <property name="text">
-              <string>Results place holder</string>
-             </property>
-            </widget>
+            <widget class="QPlainTextEdit" name="resultWindow"/>
            </item>
           </layout>
          </item>
