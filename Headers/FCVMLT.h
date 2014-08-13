@@ -12,12 +12,14 @@
 #include <qpushbutton.h>
 #include <qdir.h>
 #include "qfileinfo.h"
+#include <qcheckbox.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/nonfree.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/ml/ml.hpp>
 
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
@@ -138,7 +140,22 @@ enum statType
 };
 enum mlType
 {
-	SVM_radialBasisKernel = 0
+	// Dlib learners
+	dlib_SVM_radialBasisKernel = 0,
+
+
+
+	// opencv learners
+	cv_NBC,
+	cv_KNN,
+	cv_SVM,
+	cv_DT,
+	cv_BOOSTED,
+	cv_GBOOSTED,
+	cv_RANDOM_TREE,
+	cv_ER_TREES,
+	cv_EM,
+	cv_NN
 };
 struct param
 {
@@ -176,7 +193,19 @@ static const QList<compoundFilterType> COMPOUND_FILTER_TYPES(QList<compoundFilte
 				<<add<<subtract<<align);
 static const QList<statType> STAT_TYPES(QList<statType>()
 				<<sum<<avg<<copy<<median<<stdev<<hist<<sift<<HoG<<orb<<surf<<circle<<line<<lineP);
-static const QList<mlType> MACHINE_LEARNING_ALGORITHMS(QList<mlType>() << SVM_radialBasisKernel);
+static const QList<mlType> MACHINE_LEARNING_ALGORITHMS(QList<mlType>() 
+			<< dlib_SVM_radialBasisKernel
+			<< cv_NBC
+			<< cv_KNN
+			<< cv_SVM
+			<< cv_DT
+			<< cv_BOOSTED
+			<< cv_GBOOSTED
+			<< cv_RANDOM_TREE
+			<< cv_ER_TREES
+			<< cv_EM
+			<< cv_NN
+			);
 // Defines how a specific color will scale with values
 struct colorScale
 {
@@ -339,6 +368,8 @@ public slots:
 	QWidget*			getParamControlWidget(QWidget* parent);
 	// Update parameters of this object
 	virtual void		handleParamChange(QString val);
+	// Used for handling state change of checkboxes
+	virtual void		handleParamChange(int val);
 	// Handle accept clicked for this object
 	virtual void		handleAccept();
 	virtual void		handleCancel();
@@ -371,17 +402,20 @@ class mlContainer : public processingContainer
 {
 	Q_OBJECT
 public:
-	explicit	mlContainer(QTreeWidget* parent = 0, mlType type_ = SVM_radialBasisKernel);
-	explicit	mlContainer(QTreeWidgetItem* parent, mlType type_ = SVM_radialBasisKernel);
+	explicit	mlContainer(QTreeWidget* parent = 0, mlType type_ = dlib_SVM_radialBasisKernel);
+	explicit	mlContainer(QTreeWidgetItem* parent, mlType type_ = dlib_SVM_radialBasisKernel);
 	explicit	mlContainer(mlType type_);
 
 				~mlContainer();
 	void		initialize();
 	float		train(cv::Mat features, cv::Mat labels);
 	float		test(cv::Mat features, cv::Mat labels);
+	float		predict(cv::Mat features);
 	bool		save();
 	bool		load();
 	mlType		MLType;
+	CvStatModel* classifier;
+	cv::Mat		normalizationParameters;
 signals:
 	void results(QString line);
 };

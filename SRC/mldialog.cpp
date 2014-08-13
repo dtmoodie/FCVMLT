@@ -80,6 +80,7 @@ mlDialog::trainAlgorithms()
 	{
 		if (algorithmSelectBoxes[i]->isChecked())
 		{
+			algorithms[i]->dirName = sources->sources[0]->dirName;
 			algorithms[i]->train(X, Y);
 		}
 	}

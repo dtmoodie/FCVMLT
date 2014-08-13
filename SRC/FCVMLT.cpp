@@ -240,15 +240,25 @@ processingContainer::getParamControlWidget(QWidget* parent)
 			parameters[i].box = box;
 			connect(box, SIGNAL(currentIndexChanged(QString)), this, SLOT(handleParamChange(QString)));
 		}
+		if (parameters[i].type == t_bool)
+		{
+			QCheckBox* box = new QCheckBox(out);
+			box->setObjectName(parameters[i].name);
+			box->setToolTip(parameters[i].toolTip);
+			layout->addWidget(box, i, 1);
+			box->setChecked(parameters[i].value == 1);
+			parameters[i].box = box;
+			connect(box, SIGNAL(stateChanged(int)), this, SLOT(handleParamChange(int)));
+		}
 	}
-	QPushButton* accept = new QPushButton(out);
-	QPushButton* cancel = new QPushButton(out);
-	accept->setText("Accept Changes");
-	cancel->setText("Cancel Changes");
-	layout->addWidget(accept, parameters.size(), 0);
-	layout->addWidget(cancel, parameters.size(), 1);
-	connect(accept, SIGNAL(clicked()), this, SLOT(handleAccept()));
-	connect(cancel, SIGNAL(clicked()), this, SLOT(handleCancel()));
+	//QPushButton* accept = new QPushButton(out);
+	//QPushButton* cancel = new QPushButton(out);
+	//accept->setText("Accept Changes");
+	//cancel->setText("Cancel Changes");
+	//layout->addWidget(accept, parameters.size(), 0);
+	//layout->addWidget(cancel, parameters.size(), 1);
+	//connect(accept, SIGNAL(clicked()), this, SLOT(handleAccept()));
+	//connect(cancel, SIGNAL(clicked()), this, SLOT(handleCancel()));
 	out->setLayout(layout);
 	out->setWindowTitle(name + " Settings");
 	return out;
@@ -256,7 +266,7 @@ processingContainer::getParamControlWidget(QWidget* parent)
 void 
 processingContainer::handleParamChange(QString val)
 {
-		for (unsigned int i = 0; i < parameters.size(); ++i)
+	for (unsigned int i = 0; i < parameters.size(); ++i)
 	{
 		if (sender() == (QObject*)parameters[i].box)
 		{
@@ -281,6 +291,23 @@ processingContainer::handleParamChange(QString val)
 					update();
 				}
 			}
+			return;
+		}
+	}
+}
+void
+processingContainer::handleParamChange(int val)
+{
+	for (unsigned int i = 0; i < parameters.size(); ++i)
+	{
+		if (sender() == (QObject*)parameters[i].box)
+		{
+			if (val == 0)
+				parameters[i].value = 0;
+			else
+				parameters[i].value = 1;
+			update();
+			emit log(name + ": " + parameters[i].name + " updated to " + QString::number(parameters[i].value), 0);
 			return;
 		}
 	}
@@ -2280,18 +2307,73 @@ void
 mlContainer::initialize()
 {
 	type = ML;
-	if (MLType == SVM_radialBasisKernel)
+	parameters.push_back(param(t_bool, 0, "Normalize"));
+	if (MLType == dlib_SVM_radialBasisKernel)
 	{
-		name = "Support Vector Machine: Radial Basis Kernel";
-		parameters.resize(2);
-		parameters[0] = param(t_double, 0.5, "Gamma");
-		parameters[1] = param(t_double, 0.5, "nu");
+		name = "dlib Support Vector Machine: Radial Basis Kernel";
+		parameters.push_back(param(t_double, 0.5, "Gamma"));
+		parameters.push_back(param(t_double, 0.5, "nu"));
+	}
+	if (MLType == cv_NBC)
+	{
+		name = "Opencv normal bayes classifier";
+	}
+	if (MLType == cv_KNN)
+	{
+		name = "Opencv K Nearest Neighbors";
+	}
+	if (MLType == cv_SVM)
+	{
+		name = "Opencv Support Vector Machine";
+		QStringList types;
+		types << "C_SVC" << "NU_SVC" << "One class" << "Eps SVR" << "Nu SVR";
+		QStringList kernels;
+		kernels << "Linear" << "Polynomial" << "Radial Basis Function" << "Sigmoid";
+
+		parameters.push_back(param(t_pullDown, 0, "SVM Type", types));
+		parameters.push_back(param(t_pullDown, 0, "Kernel Type", kernels));
+		parameters.push_back(param(t_double, 0, "Degree"));
+		parameters.push_back(param(t_double, 0, "Gamma"));
+		parameters.push_back(param(t_double, 0, "Coefficient 0"));
+		parameters.push_back(param(t_double, 0, "C value"));
+		parameters.push_back(param(t_double, 0, "Nu"));
+		parameters.push_back(param(t_double, 0, "P"));
+		parameters.push_back(param(t_double, 1000, "Max iterations"));
+		parameters.push_back(param(t_double, FLT_EPSILON, "Epsilon"));
+	}
+	if (MLType == cv_DT)
+	{
+		name = "Opencv Decision Tree";
+	}
+	if (MLType == cv_BOOSTED)
+	{
+		name = "Opencv Boosted Decision Tree";
+	}
+	if (MLType == cv_GBOOSTED)
+	{
+		name = "Opencv Gradient Boosted Tree";
+	}
+	if (MLType == cv_RANDOM_TREE)
+	{
+		name = "Opencv Random Tree";
+	}
+	if (MLType == cv_ER_TREES)
+	{
+		name = "Opencv extremely random tree";
+	}
+	if (MLType == cv_EM)
+	{
+		name = "Opencv expectation maximization";
+	}
+	if (MLType == cv_NN)
+	{
+		name = "Opencv neural network";
 	}
 }
 float	
 mlContainer::train(cv::Mat features, cv::Mat labels)
 {
-	if (MLType == SVM_radialBasisKernel)
+	if (MLType == dlib_SVM_radialBasisKernel)
 	{
 		typedef dlib::radial_basis_kernel<sample_type> kernel_type;
 		// Restructure data to fit dlib format
@@ -2314,11 +2396,14 @@ mlContainer::train(cv::Mat features, cv::Mat labels)
 			X.push_back(samp);
 			Y.push_back((double)labels.at<float>(i));
 		}
-		dlib::vector_normalizer<sample_type> normalizer;
-		normalizer.train(X);
-		for (int i = 0; i < X.size(); ++i)
+		if (parameters[0].value == 1)
 		{
-			X[i] = normalizer(X[i]);
+			dlib::vector_normalizer<sample_type> normalizer;
+			normalizer.train(X);
+			for (int i = 0; i < X.size(); ++i)
+			{
+				X[i] = normalizer(X[i]);
+			}
 		}
 		
 		dlib::randomize_samples(X, Y);
@@ -2345,21 +2430,138 @@ mlContainer::train(cv::Mat features, cv::Mat labels)
 		
 		return 0;
 	}
+	// Normalize parameters for Opencv machine learning tasks
+	if (parameters[0].value == 1)
+	{
+		normalizationParameters = cv::Mat::zeros(2, features.cols, CV_32F);
+		for (int i = 0; i < features.cols; ++i)
+		{
+			cv::Mat mean, var;
+			cv::meanStdDev(features.col(i), mean, var);
+			features.col(i) = (features.col(i) - (float)mean.at<double>(0)) / (float)var.at<double>(0);
+			normalizationParameters.at<float>(0, i) = (float)mean.at<double>(0);
+			normalizationParameters.at<float>(1, i) = (float)var.at<double>(0);
+		}
+	}
+	if (MLType == cv_NBC)
+	{
+		CvNormalBayesClassifier* tmpClassifier = new CvNormalBayesClassifier(features, labels);
+		classifier = tmpClassifier;
+		emit results("Normal bayes classifier trained");
+		test(features, labels);
+		save();
+	}
+	if (MLType == cv_SVM)
+	{
+		CvSVM* tmpClassifier;
+		try
+		{
+			CvSVMParams params;
+			params.svm_type = parameters[1].value;
+			params.kernel_type = parameters[2].value;
+			params.degree = parameters[3].value;
+			params.gamma = parameters[4].value;
+			params.coef0 = parameters[5].value;
+			params.C = parameters[6].value;
+			params.nu = parameters[7].value;
+			params.p = parameters[8].value;
+			params.term_crit = cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, parameters[9].value, parameters[10].value);
+			tmpClassifier = new CvSVM(features, labels,cv::Mat(),cv::Mat(),params);
+		}catch (cv::Exception &e)
+		{
+			emit results("SVM failed to train");
+			return -1;
+		}
+		emit results("SVM trained");
+		classifier = tmpClassifier;
+		save();
+		return test(features, labels);
+	}
 }
 float	
 mlContainer::test(cv::Mat features, cv::Mat labels)
 {
-	return 0;
+	// In order to build a confusion matrix, I need to figure out how many different classes I'm dealing with
+	// Then I need to make a matrix to enter that data into
+	// Somehow I also need to deal with when the class is -1
+	// As well, it will be important to determine if the class list is continuous
+	float correct = 0;
+	for (int i = 0; i < features.rows; ++i)
+	{
+		float val = predict(features.row(i));
+		if (val == labels.at<float>(i))
+		{
+			++correct;
+		}
+	}
+	emit results(name + " testing results (% Correct): " + QString::number(correct / features.rows));
+	return correct/features.rows;
 }
 bool	
 mlContainer::save()
 {
+	if (MLType == dlib_SVM_radialBasisKernel)
+	{
+
+	}
+	if (MLType == cv_NBC)
+	{
+		CvNormalBayesClassifier* tmpClassifier = dynamic_cast<CvNormalBayesClassifier*>(classifier);
+		tmpClassifier->save((dirName + "/" + name + ".xml").toStdString().c_str());
+	}
+	if (MLType == cv_SVM)
+	{
+		CvSVM* tmpClassifier = dynamic_cast<CvSVM*>(classifier);
+		tmpClassifier->save((dirName + "/" + name + ".xml").toStdString().c_str());
+	}
+	if (MLType == cv_DT)
+	{
+		
+	}
+	if (MLType == cv_BOOSTED)
+	{
+		
+	}
+	if (MLType == cv_GBOOSTED)
+	{
+		
+	}
+	if (MLType == cv_RANDOM_TREE)
+	{
+		
+	}
+	if (MLType == cv_ER_TREES)
+	{
+		
+	}
+	if (MLType == cv_EM)
+	{
+		
+	}
+	if (MLType == cv_NN)
+	{
+		
+	}
 	return true;
 }
 bool	
 mlContainer::load()
 {
 	return true;
+}
+float
+mlContainer::predict(cv::Mat features)
+{
+	if (MLType == cv_NBC)
+	{
+		CvNormalBayesClassifier* tmpClassifier = dynamic_cast<CvNormalBayesClassifier*>(classifier);
+		return tmpClassifier->predict(features);
+	}
+	if (MLType == cv_SVM)
+	{
+		CvSVM* tmpClassifier = dynamic_cast<CvSVM*>(classifier);
+		return tmpClassifier->predict(features);
+	}
 }
 
 // ******************************************************** filterMacro ****************************************************************
