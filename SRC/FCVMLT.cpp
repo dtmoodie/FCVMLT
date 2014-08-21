@@ -2408,6 +2408,10 @@ mlContainer::train(cv::Mat features, cv::Mat labels)
 		
 		dlib::randomize_samples(X, Y);
 		const double max_nu = dlib::maximum_nu(Y);
+		if (max_nu == 0.0)
+		{
+			emit log("Error max nu is zero, only one class found in dataset", 5);
+		}
 		dlib::svm_nu_trainer<kernel_type> trainer;
 		trainer.set_kernel(kernel_type(parameters[0].value));
 		trainer.set_nu(parameters[1].value);

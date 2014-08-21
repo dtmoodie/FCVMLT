@@ -111,6 +111,11 @@ mlDialog::buildFeatures()
 		for (int j = 0; j < featureNames.size(); ++j)
 		{
 			featurePtr F = boost::dynamic_pointer_cast<featureContainer, container>(sources->sources[i]->getChild(featureNames[j]));
+			if (F == NULL)
+			{
+				emit log("Could not find feature " + featureNames[j] + " in image " + sources->sources[i]->name, 5);
+				continue;
+			}
 			if (X.empty())
 			{
 				X = F->M();
