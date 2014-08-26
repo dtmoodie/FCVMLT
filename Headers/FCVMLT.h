@@ -13,7 +13,8 @@
 #include <qdir.h>
 #include "qfileinfo.h"
 #include <qcheckbox.h>
-
+#include <qlineedit.h>
+#include <qfiledialog.h>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
@@ -86,17 +87,21 @@ enum filterType
 	canny,
 	gradientOrientation,
 	contourFilter,
-	nonMaxSuppress
+	nonMaxSuppress,
+	wearDetect
 };
 
 static const QList<filterType> FILTER_TYPES(QList<filterType>()
-	<< threshold << erode << dilate << sobel << smooth << gabor << resize << crop << grey << HSV << HSV_hue << HSV_sat << HSV_val << laplacian << pyrMeanShift << scharr << canny << gradientOrientation << contourFilter << nonMaxSuppress);
+	<< threshold << erode << dilate << sobel << smooth << gabor << resize << crop 
+	<< grey << HSV << HSV_hue << HSV_sat << HSV_val << laplacian << pyrMeanShift 
+	<< scharr << canny << gradientOrientation << contourFilter << nonMaxSuppress
+	<< wearDetect);
 
 static const QStringList FILTER_NAMES(QStringList()
 	<< "Threshold" << "Erode" << "Dilate" << "Sobel" << "Smooth" << "Gabor Filter" 
 	<< "Resize" << "Crop" << "Convert to Grey" << "Single HSV plane extraction" << "Convert to HSV hue"
 	<< "Convert to HSV saturation" << "Convert to HSV value" << "Laplacian" 
-	<< "Pyramid Mean Shift" << "Sharr Filter" << "Canny Edge Detect" << "Gradient Orientation"  << "Contour Filter" << "Non maximal suppression");
+	<< "Pyramid Mean Shift" << "Sharr Filter" << "Canny Edge Detect" << "Gradient Orientation"  << "Contour Filter" << "Non maximal suppression" << "Wear Line Detector");
 enum compoundFilterType
 {
     add = 0,
@@ -111,7 +116,8 @@ enum paramType
     t_double,
     t_int,
     t_bool,
-    t_pullDown
+    t_pullDown,
+	t_path
 };
 enum statMethod
 {
@@ -165,13 +171,18 @@ struct param
 
     param(paramType type_, double value_, QString name_, 
 		QStringList pullDown_ = QStringList(""), QString toolTip_ = ""):
-        type(type_), value(value_), name(name_), toolTip(toolTip_), pullDownItems(pullDown_)
+		type(type_), value(value_), name(name_), toolTip(toolTip_), pullDownItems(pullDown_), btn(NULL)
     {
 		minVal = -10000;
 		maxVal = 10000;
     }
 	param(paramType type_, double value_, QString name_, QString toolTip_, double min_, double max_):
-		type(type_), value(value_), name(name_), toolTip(toolTip_), maxVal(max_), minVal(min_)
+		type(type_), value(value_), name(name_), toolTip(toolTip_), maxVal(max_), minVal(min_), btn(NULL)
+	{
+
+	}
+	param(paramType type_, QString text_, QString name_, QString toolTip_):
+		pathText(text_), type(type_), name(name_), toolTip(toolTip_), btn(NULL)
 	{
 
 	}
@@ -181,8 +192,10 @@ struct param
 	double minVal;
     QString name;
     QObject* box;
+	QObject* btn;
     QString toolTip;
     QStringList pullDownItems;
+	QString pathText;
 
 	
 };
@@ -257,6 +270,7 @@ public:
 	enum containerType
 	{
 		Display = 0,
+		Reference,
 		Matrix,
 		Img,
 		Label,
@@ -308,6 +322,49 @@ public:
 	QList<containerPtr>	childContainers;
 	virtual void
 		updateDisplay();
+};
+// *********************** referenceContainer ***********************
+class referenceContainer : public container
+{
+	// This container is used for definining reference datum in an image for conversion 
+	// of pixel coordinates to real world coordinates relative to a location.
+	// The location can be either a point or a line pair.  When it is a point then either x or y 
+	// coordinates can be extracted relative to it.  But with no rotation adjustment.
+	// When the location is a line pair, then the origin is the intersection of the line pair, and rotation is adjusted accordingly.
+	// Line pairs are drawn with the X-axis in green and the Y-axis in blue.
+	// Points are drawn with a green circle of radius 5
+	referenceContainer(QTreeWidget* parent = 0);
+	referenceContainer(QTreeWidgetItem* parent);
+	referenceContainer(referenceContainer* cpy);
+	referenceContainer(QString absFilePath, QTreeWidget* parent);
+	referenceContainer(QString absFilePath, imgContainer* parent);
+	~referenceContainer();
+
+	// Defines the conversion scale between pixel coordinates and real world coordinates
+	// (U,V)*scale = (X,Y)
+	double scale;
+	// Rotates / offsets the pixel coordinates based on some origin
+	cv::Mat H;
+
+	// Set the origin based on a point in UV coordinates
+	void setOrigin(cv::Point2f pt);
+	// Set the rotation based on an angle
+	void setRotation(float theta);
+	// Set the rotation based on a vector
+	void setRotation(cv::Vec2f x_axis);
+	// Sets the transformation based on the point and an angle
+	void setTransform(cv::Point2f pt, float theta);
+	// Sets the transformation based on a point and a vector 
+	void setTransform(cv::Point2f pt, cv::Vec2f x_axis);
+	// Given an input set of points in UV coordinates, returns a set of points in XY coordinates
+	cv::Mat transformPoints(cv::Mat pts);
+	// Given an input mask, converts all non zero points to UV coordinates then converts to XY and returns
+	cv::Mat pointsFromMask(cv::Mat mask);
+
+	// This function gets the parent container then draws the reference coordinate system and a scale on the image
+
+	cv::Mat M();
+
 };
 // *********************** matrixContainer **************************
 class matrixContainer : public container
@@ -370,6 +427,7 @@ public slots:
 	virtual void		handleParamChange(QString val);
 	// Used for handling state change of checkboxes
 	virtual void		handleParamChange(int val);
+	virtual void		handlePathSelect();
 	// Handle accept clicked for this object
 	virtual void		handleAccept();
 	virtual void		handleCancel();
@@ -446,6 +504,7 @@ public:
 	bool loadChildFromDir(QString dirPath);
 	bool loadChild(QString dirName_, QString absFileName_);
 };
+
 // *********************** streamContainer **************************
 class streamContainer : public QObject, public imgContainer
 {
@@ -552,6 +611,7 @@ private:
 	imgPtr		processNonMaxSuppress(cv::Mat img);
 	// Requires a boolean input image
 	imgPtr		processContourFilter(cv::Mat img);
+	imgPtr		processWearLineExtractor(cv::Mat img);
 
     std::vector<boost::shared_ptr<boost::thread> >	procThreads;
 

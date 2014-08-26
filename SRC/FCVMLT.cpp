@@ -99,6 +99,80 @@ container::deleteChild(container* ptr)
 	}
 	return false;
 }
+
+// ************************************************ referenceContainer ************************************
+referenceContainer::referenceContainer(QTreeWidget* parent = 0):
+container(parent),
+scale(1.0)
+{
+
+}
+referenceContainer::referenceContainer(QTreeWidgetItem* parent) :
+container(parent),
+scale(1.0)
+{
+
+}
+referenceContainer::referenceContainer(referenceContainer* cpy) :
+container(cpy),
+scale(1.0)
+{
+
+}
+referenceContainer::referenceContainer(QString absFilePath, QTreeWidget* parent) :
+scale(1.0)
+{
+
+}
+referenceContainer::referenceContainer(QString absFilePath, imgContainer* parent) :
+scale(1.0)
+{
+
+}
+referenceContainer::~referenceContainer()
+{
+
+}
+void
+referenceContainer::setOrigin(cv::Point2f pt)
+{
+
+}
+void
+referenceContainer::setRotation(float theta)
+{
+
+}
+void
+referenceContainer::setRotation(cv::Vec2f x_axis)
+{
+
+}
+void
+referenceContainer::setTransform(cv::Point2f pt, float theta)
+{
+
+}
+void
+referenceContainer::setTransform(cv::Point2f pt, cv::Vec2f x_axis)
+{
+
+}
+cv::Mat
+referenceContainer::transformPoints(cv::Mat pts)
+{
+
+}
+cv::Mat 
+referenceContainer::pointsFromMask(cv::Mat mask)
+{
+
+}
+cv::Mat
+referenceContainer::M()
+{
+	// The parent container must be a label container
+}
 // ************************************************ matrixContainer ***************************************
 matrixContainer::matrixContainer(QTreeWidget* parent) :
 	container(parent)
@@ -250,18 +324,37 @@ processingContainer::getParamControlWidget(QWidget* parent)
 			parameters[i].box = box;
 			connect(box, SIGNAL(stateChanged(int)), this, SLOT(handleParamChange(int)));
 		}
+		if (parameters[i].type == t_path)
+		{
+			QLineEdit* box = new QLineEdit(out);
+			box->setObjectName(parameters[i].name);
+			box->setToolTip(parameters[i].toolTip);
+			layout->addWidget(box, i, 1);
+			parameters[i].box = box;
+			box->setText(parameters[i].pathText);
+			connect(box, SIGNAL(textEdited(QString)), this, SLOT(handleParamChange(QString)));
+
+			QPushButton* btn = new QPushButton(out);
+			btn->setText("Select file");
+			layout->addWidget(btn, i, 2);
+			parameters[i].btn = btn;
+			connect(btn, SIGNAL(clicked()), parent, SLOT(handlePathSelect()));
+		}
 	}
-	//QPushButton* accept = new QPushButton(out);
-	//QPushButton* cancel = new QPushButton(out);
-	//accept->setText("Accept Changes");
-	//cancel->setText("Cancel Changes");
-	//layout->addWidget(accept, parameters.size(), 0);
-	//layout->addWidget(cancel, parameters.size(), 1);
-	//connect(accept, SIGNAL(clicked()), this, SLOT(handleAccept()));
-	//connect(cancel, SIGNAL(clicked()), this, SLOT(handleCancel()));
 	out->setLayout(layout);
 	out->setWindowTitle(name + " Settings");
 	return out;
+}
+void
+processingContainer::handlePathSelect()
+{
+	for (unsigned int i = 0; i < parameters.size(); ++i)
+	{
+		if (sender() == (QObject*)parameters[i].btn)
+		{
+			//parameters[i].pathText = QFileDialog::getOpenFileName(this, "Select file");
+		}
+	}
 }
 void 
 processingContainer::handleParamChange(QString val)
@@ -270,6 +363,12 @@ processingContainer::handleParamChange(QString val)
 	{
 		if (sender() == (QObject*)parameters[i].box)
 		{
+			if (parameters[i].type == t_path)
+			{
+				parameters[i].pathText = val;
+				emit log(name + ": " + parameters[i].name + " updated to " + val, 0);
+				update();
+			}
 			if (parameters[i].type == t_pullDown)
 			{
 				for (unsigned int j = 0; j < parameters[i].pullDownItems.size(); ++j)
@@ -824,7 +923,6 @@ featureWindowContainer::extractFeatures()
 			}
 		}else
 		{
-			
 			if (!curExtractor->extractFeatures(curSource->M(), output->M()))
 			{
 				return featurePtr();
@@ -851,7 +949,6 @@ featureWindowContainer::extractFeatures()
 				}
 			}
 		}
-		
 	}
 	
 	
@@ -903,10 +1000,16 @@ featureWindowContainer::extractFeatures()
 					break;
 				if (i * parameters[3].value + parameters[1].value > curSource->M().rows)
 					break;
-				cv::Mat roi = curSource->M()(cv::Rect(j * parameters[2].value,
-					i * parameters[3].value,
-					parameters[0].value,
-					parameters[1].value));
+				// top left X, Y, width, height
+				cv::Mat roi = curSource->M()(cv::Rect(j*parameters[2].value - (int)parameters[0].value / 2,
+													  i*parameters[3].value - (int)parameters[1].value / 2,
+													  parameters[0].value,
+													  parameters[1].value));
+
+				//cv::Mat roi = curSource->M()(cv::Rect(j * parameters[2].value,
+				//							i * parameters[3].value,
+				//							parameters[0].value,
+				//							parameters[1].value));
 				cv::Mat tmp = output->_M;
 				curExtractor->extractFeatures(roi, output->_M.row(featureRowCount));
 				++featureRowCount;
@@ -1150,6 +1253,7 @@ imgContainer::loadChild(QString dirName_, QString absFileName_)
 	}
 	return false;
 }
+
 // ************************************************ streamContainer ***************************************
 streamContainer::streamContainer(QTreeWidget *parent):
 	imgContainer(parent)
@@ -1681,6 +1785,13 @@ filterContainer::initialize()
 		parameters.resize(1);
 		parameters[0] = param(t_float, 0.8, "% of max", "", 0, 1);
 	}
+	if (fType == wearDetect)
+	{
+		name = "Wear Line Detector";
+		parameters.resize(2);
+		parameters[0] = param(t_float, 0.1, "% of max", "", 0, 1);
+		parameters[1] = param(t_path, "C:/code/build/FCVMLT/bin/debug/learned_function.dat", "Path", "Path to saved function");
+	}
 }
 void			
 filterContainer::writeSettingsXML(cv::FileStorage& fs)
@@ -1794,6 +1905,9 @@ filterContainer::process(containerPtr cont_)
 		break;
 	case nonMaxSuppress:
 		output = processNonMaxSuppress(I->M());
+		break;
+	case wearDetect:
+		output = processWearLineExtractor(I->M());
 		break;
 	}
 	boost::posix_time::ptime end = boost::posix_time::microsec_clock::universal_time();
@@ -2242,6 +2356,69 @@ filterContainer::processNonMaxSuppress(cv::Mat img)
 	output->_M = img > maxVal*parameters[0].value;
 	return output;
 }
+imgPtr
+filterContainer::processWearLineExtractor(cv::Mat img)
+{
+	// Load the SVM from disk
+	typedef dlib::matrix<double, 0, 1> sample_type;
+	typedef dlib::radial_basis_kernel<sample_type> kernel_type;
+	typedef dlib::decision_function<kernel_type> dec_funct_type;
+	typedef dlib::normalized_function<dec_funct_type> funct_type;
+	funct_type learned_funct;
+	try
+	{
+		dlib::deserialize(parameters[1].pathText.toStdString()) >> learned_funct;
+	}
+	catch (std::exception &e)
+	{
+		std::cout << e.what() << std::endl;
+		emit log(QString(e.what()), 4);
+		return output;
+	}
+	
+	// The input image for this function should be the output of simple.xml
+	// Thus img is a sobel of the saturation plane of the original image
+	
+	// Perform non-maximal suppression to get a mask for processing
+	double minVal, maxVal;
+	cv::minMaxIdx(img, &minVal, &maxVal);
+	cv::Mat mask = img > maxVal*parameters[0].value;
+	output->_M = cv::Mat::zeros(img.size(), CV_8U);
+	for (int y = 0; y < img.rows; ++y)
+	{
+		for(int x = 0; x < img.cols; ++x)
+		{
+			if (mask.at<uchar>(y, x) == 255)
+			{
+				cv::Mat roi;
+				try
+				{
+					roi = img(cv::Rect(x, y, 20, 1));
+				}catch (cv::Exception &e)
+				{
+					continue;
+				}
+				sample_type samp;
+				samp.set_size(20, 1);
+				for (int i = 0; i < 20; ++i)
+				{
+					samp(i) = (double)roi.at<float>(i);
+				}
+				double val = learned_funct(samp);
+				if (val > 0)
+				{
+					// This is a positive example
+					output->_M.at<uchar>(y,x) = 255;
+				}
+				if (val < 0)
+				{
+
+				}
+			}
+		}
+	}
+	return output;
+}
 void 
 filterContainer::gradientOrientationHelper(cv::Mat gradX, cv::Mat gradY, cv::Mat orientation, int threadNum)
 {
@@ -2396,6 +2573,10 @@ mlContainer::train(cv::Mat features, cv::Mat labels)
 			X.push_back(samp);
 			Y.push_back((double)labels.at<float>(i));
 		}
+		typedef dlib::decision_function<kernel_type> dec_funct_type;
+		typedef dlib::normalized_function<dec_funct_type> funct_type;
+		funct_type learned_function;
+		
 		if (parameters[0].value == 1)
 		{
 			dlib::vector_normalizer<sample_type> normalizer;
@@ -2404,6 +2585,7 @@ mlContainer::train(cv::Mat features, cv::Mat labels)
 			{
 				X[i] = normalizer(X[i]);
 			}
+			learned_function.normalizer = normalizer;
 		}
 		
 		dlib::randomize_samples(X, Y);
@@ -2415,23 +2597,55 @@ mlContainer::train(cv::Mat features, cv::Mat labels)
 		dlib::svm_nu_trainer<kernel_type> trainer;
 		trainer.set_kernel(kernel_type(parameters[0].value));
 		trainer.set_nu(parameters[1].value);
-		for (double gamma = 0.00001; gamma <= 1; gamma *= 5){
-			for (double nu = 0.00001; nu < max_nu; nu *= 5){
+		double bestGamma = 0.0;
+		double bestNu = 0.0;
+		double bestVal = 0.0;
+		for (double gamma = 0.00001; gamma <= 1; gamma *= 5)
+		{
+			for (double nu = 0.00001; nu < max_nu; nu *= 5)
+			{
 				trainer.set_kernel(kernel_type(gamma));
 				trainer.set_nu(nu);
 				std::cout << "Gamma: " << gamma << " nu: " << nu;
 				try{
 					dlib::matrix<double, 1, 2> score = dlib::cross_validate_trainer(trainer, X, Y, 3);
 					std::cout << " Accuracy: " << score;
-					emit results(name + " trained with gamma: " + QString::number(parameters[0].value) +
-						" nu: " + QString::number(parameters[1].value) + " score: " + QString::number(score(0)) + " / " + QString::number(score(1)));
+					if (score(0) + score(1) > bestVal)
+					{
+						bestVal = score(0) + score(1);
+						bestGamma = gamma;
+						bestNu = nu;
+					}
+					emit results(name + " trained with gamma: " + QString::number(gamma) +
+						" nu: " + QString::number(nu) + " score: " + QString::number(score(0)) + " / " + QString::number(score(1)));
 				}
 				catch (std::exception &e){
 					std::cout << e.what() << std::endl;
 				}
 			}
 		}
+		// Now retrain using the best paramters that we found and save that shit yo
 		
+		trainer.set_kernel(kernel_type(bestGamma));
+		trainer.set_nu(bestNu);
+		dlib::matrix<double, 1, 2> score = dlib::cross_validate_trainer(trainer, X, Y, 3);
+		learned_function.function = trainer.train(X, Y);
+		dlib::serialize("learned_function.dat") << learned_function;
+		int numVectors = learned_function.function.basis_vectors.size();
+		emit results(name + " training final function with gamma: " + QString::number(bestGamma) + " and nu: " + QString::number(bestNu) +
+			" results in a function with: " + QString::number(numVectors) + " support vectors");
+		emit results("Reducing support vectors");
+		if (numVectors > 300)
+		{
+			for (int i = numVectors; i > 100; i /= 10)
+			{
+				dlib::matrix<double, 1, 2> score = dlib::cross_validate_trainer(dlib::reduced2(trainer, i), X, Y, 3);
+				emit results(name + " trained with " + QString::number(i) +
+					" support vectors, score: " + QString::number(score(0)) + " / " + QString::number(score(1)));
+				learned_function.function = reduced2(trainer, 10).train(X, Y);
+				dlib::serialize("learned_function_" + QString::number(i).toStdString() + ".dat") << learned_function;
+			}
+		}
 		return 0;
 	}
 	// Normalize parameters for Opencv machine learning tasks

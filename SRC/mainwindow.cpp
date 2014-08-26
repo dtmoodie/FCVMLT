@@ -529,17 +529,10 @@ MainWindow::displayMat(cv::Mat features,bool isImg)
 void 
 MainWindow::on_actionApply_filters_to_all_iamges_triggered()
 {
-    for(int i = 0; i < sources->sourceList->topLevelItemCount(); ++i)
+    for(int i = 0; i < sources->sources.size(); ++i)
     {
-        container* cont = dynamic_cast<container*>(sources->sourceList->topLevelItem(i));
-		if (cont->type == container::Img)
-		{
-			imgContainer* tmp = dynamic_cast<imgContainer*>(cont);
-			if (!tmp->load()) return;
-			//if (tmp->M.empty()) tmp->M = cv::imread(cont->filePath.toStdString());
-			filter->handleImgChange(tmp);
-			tmp->_M.release();
-		}
+		imgPtr cont = sources->sources[i];
+		filter->handleImgChange(cont);
     }
 }
 

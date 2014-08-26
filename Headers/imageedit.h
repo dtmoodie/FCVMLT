@@ -149,6 +149,7 @@ public slots:
 	void handleSizeChanged(int val);
 	void handleLineToggled(bool val);
 	void handleSaveDrawing();
+
 signals:
     void dragStart(QPoint pos);
     void dragPos(QPoint pos);

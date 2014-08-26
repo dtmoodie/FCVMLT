@@ -59,6 +59,8 @@ public slots:
     void updateFilterImages(int idx);
 	void handleLog(QString line, int level);
 
+	void handlePathSelect();
+
 signals:
     void filterImgChanged(cv::Mat img);
 	void filterImgChanged(containerPtr img);

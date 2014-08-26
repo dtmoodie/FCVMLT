@@ -56,6 +56,11 @@ filterWidget::filterWidget(QWidget *parent, cv::Mat curImg_) :
     connect(saveImg, SIGNAL(clicked()), this, SLOT(handleSaveImage()));
 	layout->addWidget(saveImg, 4, 1);
 
+	QPushButton* acceptFilter = new QPushButton(this);
+	acceptFilter->setText("Accept Filter");
+	layout->addWidget(acceptFilter, 4, 2);
+	connect(acceptFilter, SIGNAL(clicked()), this, SLOT(handleFilterAccepted()));
+
     // Filter selection
     filterSelect = new QGridLayout(this);
 
@@ -97,7 +102,14 @@ filterWidget::handleFilterSelect()
 		{
 			currentFilter = filters[i];
 			if (filterSettings != NULL) delete filterSettings;
-			filterSettings = filters[i]->getParamControlWidget(this);
+			filterSettings = currentFilter->getParamControlWidget(this);
+			for (int i = 0; i < currentFilter->parameters.size(); ++i)
+			{
+				if (currentFilter->parameters[i].btn != NULL)
+				{
+					//connect(currentFilter->parameters[i].btn, SIGNAL(clicked()), this, SLOT(handlePathSelect()));
+				}
+			}
 			layout->addWidget(filterSettings, 4, 3);
 			containerPtr output = filters[i]->process(currentBase);
 			if (output == NULL) return;
@@ -211,12 +223,24 @@ filterWidget::handleFilterAccepted()
     // Save filter stuff to the filter history window
 	// Make a copy of the filter parameters memory so it can be re-applied
 	
-	filterContainer* tmpContainer = dynamic_cast<filterContainer*>(sender());
-	filterPtr tmp = tmpContainer->getDisplayCopy();
+	//filterContainer* tmpContainer = dynamic_cast<filterContainer*>(sender());
+	filterPtr tmp = currentFilter->getDisplayCopy();
 	connect(tmp.get(), SIGNAL(parameterUpdated()), this, SLOT(handleFilterUpdated()));
 	filterHistory->addTopLevelItem(tmp.get());
 	savedFilters.push_back(tmp);
-	currentBase = tmpContainer->output;
+	currentBase = currentFilter->output;
+}
+void 
+filterWidget::handlePathSelect()
+{
+	for (int i = 0; i < currentFilter->parameters.size(); ++i)
+	{
+		if (sender() == currentFilter->parameters[i].btn)
+		{
+			currentFilter->parameters[i].pathText = QFileDialog::getOpenFileName(this, "Select file");
+			return;
+		}
+	}
 }
 void 
 filterWidget::handleFilterParamsDestroyed()
@@ -244,6 +268,13 @@ filterWidget::handleFilterHistSelect(QTreeWidgetItem *item, int column)
 	// Update the parameter control area to reflect this filter
 	if (filterSettings) delete filterSettings;
 	filterSettings = currentFilter->getParamControlWidget(this);
+	for (int i = 0; i < currentFilter->parameters.size(); ++i)
+	{
+		if (currentFilter->parameters[i].btn != NULL)
+		{
+			connect(currentFilter->parameters[i].btn, SIGNAL(clicked()), this, SLOT(handlePathSelect()));
+		}
+	}
 	layout->addWidget(filterSettings, 4, 3);
 
 }
