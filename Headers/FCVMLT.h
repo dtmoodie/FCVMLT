@@ -342,7 +342,7 @@ class referenceContainer : public container
 
 	// Defines the conversion scale between pixel coordinates and real world coordinates
 	// (U,V)*scale = (X,Y)
-	double scale;
+	float scale;
 	// Rotates / offsets the pixel coordinates based on some origin
 	cv::Mat H;
 
@@ -358,6 +358,7 @@ class referenceContainer : public container
 	void setTransform(cv::Point2f pt, cv::Vec2f x_axis);
 	// Given an input set of points in UV coordinates, returns a set of points in XY coordinates
 	cv::Mat transformPoints(cv::Mat pts);
+	cv::Mat transformPoints(std::vector<cv::Point2f> pts);
 	// Given an input mask, converts all non zero points to UV coordinates then converts to XY and returns
 	cv::Mat pointsFromMask(cv::Mat mask);
 

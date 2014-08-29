@@ -101,33 +101,33 @@ container::deleteChild(container* ptr)
 }
 
 // ************************************************ referenceContainer ************************************
-referenceContainer::referenceContainer(QTreeWidget* parent = 0):
+referenceContainer::referenceContainer(QTreeWidget* parent):
 container(parent),
 scale(1.0)
 {
-
+	H = cv::Mat::eye(2, 3, CV_32F);
 }
 referenceContainer::referenceContainer(QTreeWidgetItem* parent) :
 container(parent),
 scale(1.0)
 {
-
+	H = cv::Mat::eye(2, 3, CV_32F);
 }
 referenceContainer::referenceContainer(referenceContainer* cpy) :
 container(cpy),
 scale(1.0)
 {
-
+	H = cv::Mat::eye(2, 3, CV_32F);
 }
 referenceContainer::referenceContainer(QString absFilePath, QTreeWidget* parent) :
 scale(1.0)
 {
-
+	H = cv::Mat::eye(2, 3, CV_32F);
 }
 referenceContainer::referenceContainer(QString absFilePath, imgContainer* parent) :
 scale(1.0)
 {
-
+	H = cv::Mat::eye(2, 3, CV_32F);
 }
 referenceContainer::~referenceContainer()
 {
@@ -136,7 +136,8 @@ referenceContainer::~referenceContainer()
 void
 referenceContainer::setOrigin(cv::Point2f pt)
 {
-
+	H.at<float>(0, 2) = pt.x;
+	H.at<float>(1, 2) = pt.y;
 }
 void
 referenceContainer::setRotation(float theta)
@@ -151,27 +152,64 @@ referenceContainer::setRotation(cv::Vec2f x_axis)
 void
 referenceContainer::setTransform(cv::Point2f pt, float theta)
 {
-
+	setOrigin(pt);
 }
 void
 referenceContainer::setTransform(cv::Point2f pt, cv::Vec2f x_axis)
 {
-
+	setOrigin(pt);
 }
 cv::Mat
 referenceContainer::transformPoints(cv::Mat pts)
+{
+	if (H.type() != CV_32F) H.convertTo(H, CV_32F);
+	if (pts.type() != CV_32F) pts.convertTo(pts, CV_32F);
+	try
+	{
+		cv::Mat out = H*pts;
+		return out*scale;
+	}catch (cv::Exception &e)
+	{
+		std::cout << e.what() << std::endl;
+		return pts;
+	}
+}
+cv::Mat
+referenceContainer::transformPoints(std::vector<cv::Point2f> pts)
 {
 
 }
 cv::Mat 
 referenceContainer::pointsFromMask(cv::Mat mask)
 {
-
+	if (mask.type() != CV_8U) return cv::Mat();
+	int numPts = cv::countNonZero(mask);
+	cv::Mat pts = cv::Mat::ones(3, numPts, CV_32F);
+	int itr = 0;
+	for (int y = 0; y < mask.rows; ++y)
+	{
+		for (int x = 0; x < mask.cols; ++x)
+		{
+			if (mask.at<uchar>(y, x) != 0)
+			{
+				pts.at<float>(0, itr) = x;
+				pts.at<float>(1, itr) = y;
+			}
+		}
+	}
+	return transformPoints(pts);;
 }
 cv::Mat
 referenceContainer::M()
 {
-	// The parent container must be a label container
+	// Get the image from the parent container and then draw the reference on it
+	if (parentContainer->type != Img) return cv::Mat();
+	cv::Mat src = boost::dynamic_pointer_cast<imgContainer, container>(parentContainer)->M();
+	// For now just drawing the origin point
+	cv::Point2f origin(H.at<float>(1, 2), H.at<float>(0, 2));
+	cv::Mat output = src.clone();
+	cv::circle(output, origin, 5, cv::Scalar(0, 255, 0));
+	return output;
 }
 // ************************************************ matrixContainer ***************************************
 matrixContainer::matrixContainer(QTreeWidget* parent) :
