@@ -35,6 +35,7 @@ endmacro(ADD_SUB_PROJECTS)
 set(Qt5_DIR $ENV{Qt5_ROOT})
 set(OpenCV_DIR $ENV{OpenCV_ROOT})
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
+
 set(SUBPROJECTS "")
 ADD_SUB_PROJECTS(${CMAKE_CURRENT_SOURCE_DIR} FCVMLT)
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/Bin/${CMAKE_BUILD_TYPE} CACHE PATH "Library output path")
@@ -46,16 +47,18 @@ set(CMAKE_AUTOMOC_MOC_OPTIONS "-bstdafx.h" "-fstdafx.h")
 
 
 FIND_PACKAGE(Qt5 COMPONENTS Gui Widgets Core OpenGL PrintSupport)
-FIND_PACKAGE(OpenCV 2.4.9 EXACT REQUIRED core imgproc highgui nonfree)
+FIND_PACKAGE(OpenCV REQUIRED core imgproc highgui nonfree)
 set(OpenCV_LIBS opencv_highgui opencv_imgproc opencv_nonfree opencv_core)
+message(Found opencv version: ${OpenCV_VERSION})
+
 
 FIND_PACKAGE(OpenGL)
 if( OPENGL_FOUND)
-message(STATUS "Found OpenGL")
-INCLUDE_DIRECTORIES(${OpenGL_INCLUDE_DIRS})
-LINK_DIRECTORIES(${OpenGL_LIBRARY_DIRS})
-ADD_DEFINITIONS(${OpenGL_DEFINITIONS})
-#ADD_DEFINITIONS(-DOPENGL)
+	message(STATUS "Found OpenGL")
+	INCLUDE_DIRECTORIES(${OpenGL_INCLUDE_DIRS})
+	LINK_DIRECTORIES(${OpenGL_LIBRARY_DIRS})
+	ADD_DEFINITIONS(${OpenGL_DEFINITIONS})
+	#ADD_DEFINITIONS(-DOPENGL)
 endif(OPENGL_FOUND)
 
 
@@ -66,13 +69,12 @@ set(BOOST_INCLUDEDIR "@Boost_INCLUDE_DIR@")
 set(BOOST_REQUIRED_MODULES system filesystem thread date_time iostreams chrono)
 set(Boost_NO_BOOST_CMAKE ON)
 find_package(Boost 1.47.0 REQUIRED COMPONENTS ${BOOST_REQUIRED_MODULES})
-#find_package(Qwt)
-if(WIN32)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 
+if(WIN32)
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 else(WIN32)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 endif(WIN32)
 
 
@@ -80,13 +82,11 @@ file(GLOB sources "SRC/*.cpp")# "base/src/*.cpp" "imebra/src/*.cpp")
 file(GLOB headers "Headers/*.h")# "base/include/*.h" "imebra/include/*.h")
 file(GLOB forms "*UIs/*.ui")
 
-#file(GLOB libs "../build/dicomLoader/Release/*.lib")
 
 QT5_WRAP_UI(UIS ${forms})
 QT5_WRAP_CPP(MOC ${sources} ${headers})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 
-#add_definitions(-DKEITH_BUILD)
 add_definitions(-DPUNTOEXE_WINDOWS)
 add_definitions(-DNOMINMAX)
 
@@ -97,7 +97,7 @@ source_group("Linked Libraries" FILES ${QT_LIBRARIES})# ${OpenCV_LIBS} ${Boost_L
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/Headers)
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
-INCLUDE_DIRECTORIES(${OPENCV_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5Gui_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5Core_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5PrintSupport_INCLUDE_DIRS})

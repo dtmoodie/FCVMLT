@@ -9,11 +9,16 @@ endif(WIN32)
 FIND_PACKAGE(OpenCV REQUIRED core)
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui)
 
-INCLUDE_DIRECTORIES(${OPENCV_INCLUDE_DIR})
+foreach(dir ${OpenCV_INCLUDE_DIRS})
+	message(${dir})
+endforeach(dir)
+
+
 file(GLOB sources "*.cpp" "base/src/*.cpp" "imebra/src/*.cpp")
 file(GLOB headers "*.h" "base/include/*.h" "imebra/include/*.h")
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/Headers)
+INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
 
 
 add_library(dicomLoader SHARED
