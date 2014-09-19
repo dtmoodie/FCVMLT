@@ -19,6 +19,7 @@
 #include <QTextStream>
 #include <qlineedit.h>
 #include <qmimedata.h>
+#include <QMenu>
 #include "imgsourceswidget.h"
 
 #include <opencv2/core/core.hpp>
@@ -150,6 +151,8 @@ public slots:
 	void handleLineToggled(bool val);
 	void handleSaveDrawing();
 
+	void onRightClick(const QPoint& pt);
+
 signals:
     void dragStart(QPoint pos);
     void dragPos(QPoint pos);
@@ -215,6 +218,7 @@ private:
 	QSpinBox* labelHeight;
     QGridLayout* layout;
 
+	cv::Point2f orgImgPoint;
 
 	// Colormapping values
 	double minVal;

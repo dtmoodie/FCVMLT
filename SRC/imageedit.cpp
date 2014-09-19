@@ -70,6 +70,7 @@ imgDropLabel::dropEvent(QDropEvent *event)
 
 				containerPtr img = sourceList->getContainer(dynamic_cast<container*>(item));
 				if (img == NULL) return;
+				setText(img->name);
 				emit imgReceived(img);
 			}
 			else
@@ -347,6 +348,9 @@ imageEdit::imageEdit(QWidget *parent, imgSourcesWidget* sourceList_) :
 	_editingEnable->setCheckable(true);
 	connect(_editingEnable, SIGNAL(checked(bool)), this, SLOT(handleImageEditing(bool)));
 	setAcceptDrops(true);
+	imgDisp->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(imgDisp, SIGNAL(customContextMenuRequested(const QPoint&)),
+		this, SLOT(onRightClick(const QPoint&)));
 }
 imageEdit::~imageEdit()
 {
@@ -448,7 +452,6 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
             end = event->pos();
 			dragging = false;
             emit dragEnd(event->pos());
-            //calcRect(start,end);
 
 			float scaleX = (float)currentROI.width / (float)imgDisp->width();
 			float scaleY = (float)currentROI.height / (float)imgDisp->height();
@@ -458,8 +461,12 @@ imageEdit::eventFilter(QObject *obj, QEvent *ev)
 			float posXE = scaleX*end.x() + currentROI.x;
 			float posYE = scaleY*end.y() + currentROI.y;
 			// Point in original image without scaling or shifting
-			cv::Point orgImgPoint(posXE, posYE);
-			
+			orgImgPoint = cv::Point2f(posXE, posYE);
+			if (event->button() == Qt::RightButton)
+			{
+				// Create a popup at this location
+
+			}
 			if (QApplication::keyboardModifiers() == Qt::ControlModifier && !_editing)
 			{
 				float x = MIN(orgImgPoint.x, firstClickInOriginal.x);
@@ -706,6 +713,74 @@ imageEdit::changeImg(cv::Mat img, bool update)
 
 	}
 	drawImg(roiImg);
+}
+void 
+imageEdit::onRightClick(const QPoint& pt)
+{
+	float scaleX = (float)currentROI.width / (float)imgDisp->width();
+	float scaleY = (float)currentROI.height / (float)imgDisp->height();
+	// Position in ROI image... Need to adjust based on current ROI position
+	// Start positions in original image
+	float posXS = scaleX*start.x() + currentROI.x;
+	float posYS = scaleY*start.y() + currentROI.y;
+	// End positions in original image
+	float posXE = scaleX*pt.x() + currentROI.x;
+	float posYE = scaleY*pt.y() + currentROI.y;
+	QPoint globalPos = imgDisp->mapToGlobal(pt);
+	QMenu myMenu;
+	myMenu.addAction("Set Reference");
+	myMenu.addAction("Measure Artifact");
+	QAction* selectedItem = myMenu.exec(globalPos);
+	if (selectedItem)
+	{
+		QString text = selectedItem->text();
+		if (text == "Set Reference")
+		{
+			referencePtr ref = boost::dynamic_pointer_cast<referenceContainer, container>(curCont->getChild("Reference"));
+			if (ref == NULL)
+			{
+				ref.reset(new referenceContainer((QTreeWidgetItem*)curCont));
+			}
+			ref->setOrigin(cv::Point2f(posXE, posYE));
+			curCont->getParent()->addChild(ref.get());
+			curCont->getParent()->childContainers.push_back(ref);
+			// Display the new origin
+			changeImg(ref->M());
+		}
+		if (text == "Measure Artifact")
+		{
+			referencePtr ref = boost::dynamic_pointer_cast<referenceContainer, container>(curCont->getChild("Reference"));
+			if (ref == NULL)
+			{
+				ref.reset(new referenceContainer((QTreeWidgetItem*)curCont));
+			}
+			float UVdist = sqrt((posXE - posXS)*(posXE - posXS) + (posYE - posYS)*(posYE - posYS));
+			// Create a blocking popup dialog for entering the real world mm distance
+			QDialog tmpDialog;
+			QGridLayout tmpLayout(&tmpDialog);
+			tmpDialog.setLayout(&tmpLayout);
+
+			QLabel tmpLabel(&tmpDialog);
+			tmpLabel.setText("Enter real world distance");
+			tmpLayout.addWidget(&tmpLabel);
+
+			QLineEdit tmpEdit(&tmpDialog);
+			tmpLayout.addWidget(&tmpEdit);
+			QPushButton ok(&tmpDialog);
+			tmpLayout.addWidget(&ok);
+			ok.setText("Ok");
+			connect(&ok, SIGNAL(clicked()), &tmpDialog, SLOT(accept()));
+
+			tmpDialog.exec();
+			float realDist = tmpEdit.text().toFloat();
+			ref->setScale(UVdist, realDist);
+			emit log("Scale set to " + QString::number(realDist) + " units per " + QString::number(UVdist) + " pixels", 4);
+			curCont->getParent()->addChild(ref.get());
+			curCont->getParent()->childContainers.push_back(ref);
+			// Display the new origin
+			changeImg(ref->M());
+		}
+	}
 }
 void 
 imageEdit::dragEnterEvent(QDragEnterEvent *event)
@@ -1301,6 +1376,7 @@ imageEdit::handleAcceptLabel()
 	child->label = lbl;
     child->setText(0,txtLabel + " mask");
 	child->setText(1, QString::number(lbl));
+	child->name = txtLabel + " mask";
 	child->polygons.push_back(polygonInOriginal);
 	child->dirName = curCont->dirName + "/labels";
 	child->baseName = curCont->baseName;

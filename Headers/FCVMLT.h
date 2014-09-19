@@ -21,6 +21,8 @@
 #include <opencv2/nonfree/nonfree.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/ml/ml.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <fstream>
 
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
@@ -45,6 +47,7 @@ class featureExtractorContainer;
 class featureWindowContainer;
 class statContainer;
 class filterMacro;
+class referenceContainer;
 
 typedef boost::shared_ptr<container> containerPtr;
 typedef boost::shared_ptr<matrixContainer> matrixPtr;
@@ -60,6 +63,7 @@ typedef boost::shared_ptr<featureExtractorContainer> featureExtractorPtr;
 typedef boost::shared_ptr<featureWindowContainer> featureWindowPtr;
 typedef boost::shared_ptr<statContainer> statPtr;
 typedef boost::shared_ptr<filterMacro> macroPtr;
+typedef boost::shared_ptr<referenceContainer> referencePtr;
 
 // Machine learning dlib typedefs
 
@@ -297,6 +301,7 @@ public:
 	// Recursive search for a specific child based on name
 	virtual containerPtr getChild(QString name);
 	virtual containerPtr getChild(container* ptr);
+	virtual container* getParent();
 	virtual bool deleteChild(QString name);
 	virtual bool deleteChild(container* ptr);
 
@@ -333,8 +338,11 @@ class referenceContainer : public container
 	// When the location is a line pair, then the origin is the intersection of the line pair, and rotation is adjusted accordingly.
 	// Line pairs are drawn with the X-axis in green and the Y-axis in blue.
 	// Points are drawn with a green circle of radius 5
+public:
 	referenceContainer(QTreeWidget* parent = 0);
 	referenceContainer(QTreeWidgetItem* parent);
+	referenceContainer(containerPtr parent);
+	referenceContainer(imgPtr parent);
 	referenceContainer(referenceContainer* cpy);
 	referenceContainer(QString absFilePath, QTreeWidget* parent);
 	referenceContainer(QString absFilePath, imgContainer* parent);
@@ -342,10 +350,12 @@ class referenceContainer : public container
 
 	// Defines the conversion scale between pixel coordinates and real world coordinates
 	// (U,V)*scale = (X,Y)
+	// Units are (real world units)/pixels
 	float scale;
 	// Rotates / offsets the pixel coordinates based on some origin
 	cv::Mat H;
-
+	void setScale(cv::Vec2f UVdist, float realDist);
+	void setScale(float UVdist, float realDist);
 	// Set the origin based on a point in UV coordinates
 	void setOrigin(cv::Point2f pt);
 	// Set the rotation based on an angle
@@ -488,6 +498,7 @@ public:
 	// Create an image container referencing an image on disk
 	imgContainer(QString absFilePath, QTreeWidget* parent);
 	imgContainer(QString absFilePath, imgContainer* parent);
+	imgContainer(imgContainer* parent, QString name);
 	~imgContainer();
 
 	// Name if loaded from disk

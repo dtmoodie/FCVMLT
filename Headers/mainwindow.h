@@ -25,6 +25,7 @@
 #include "registrationdialog.h"
 #include "drawtoolwidget.h"
 #include <sstream>
+#include "measurementdialog.h"
 
 
 #define VERBOSITY_LEVEL 0
@@ -84,6 +85,8 @@ private slots:
 	void handleOpenRegistration();
 
 	void handleOpenDrawMenu();
+
+	void onOpenMeasurement();
 signals:
 
     void consoleOutput(QString msg);
@@ -101,6 +104,7 @@ private:
 	//CQtOpenCVViewerGl*			filteredImg;
     mlDialog*				machineLearning;
 	compoundImgFunction*	compoundFilterWidget;
+	measurementDialog*		measurement;
 	
 	QDockWidget*		compoundDock;
     QDockWidget*        sourceDock;

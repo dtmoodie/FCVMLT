@@ -31,9 +31,9 @@ _sourceList(sourceList)
 
 	connect(ui->registered, SIGNAL(dragStart(QPoint)), this, SLOT(handleDragStart(QPoint)));
 	connect(ui->registered, SIGNAL(dragPos(QPoint)), this, SLOT(handleDrag(QPoint)));
-	connect(ui->input, SIGNAL(lineDrawn(cv::Point, cv::Point)), this, SLOT(handleLineSelect(cv::Point, cv::Point)));
+	connect(ui->input,	SIGNAL(lineDrawn(cv::Point, cv::Point)), this, SLOT(handleLineSelect(cv::Point, cv::Point)));
 	connect(ui->source, SIGNAL(lineDrawn(cv::Point, cv::Point)), this, SLOT(handleLineSelect(cv::Point, cv::Point))); 
-	connect(ui->input, SIGNAL(imageChanged(imgPtr)), this, SLOT(handleImageChanged(imgPtr)));
+	connect(ui->input,	SIGNAL(imageChanged(imgPtr)), this, SLOT(handleImageChanged(imgPtr)));
 	connect(ui->source, SIGNAL(imageChanged(imgPtr)), this, SLOT(handleImageChanged(imgPtr)));
 	_sourceVec = cv::Vec2f(-1, -1);
 	_destVec = cv::Vec2f(-1, -1);
@@ -114,17 +114,35 @@ registrationDialog::on_btnSelectInput_clicked(bool val)
 void 
 registrationDialog::on_btnSaveRegistration_clicked()
 {
-	imgPtr child( new imgContainer(currentInput.get())) ;
-	child->setText(0, "Registered");
+	imgPtr child = boost::dynamic_pointer_cast<imgContainer,container>(currentInput->getChild("Registered"));
+	if (child == NULL)
+	{
+		child.reset(new imgContainer());
+		child->name = "Registered";
+		child->setText(0, "Registered");
+		child->dirName = currentInput->dirName + "/Registered";
+		child->baseName = currentInput->baseName;
+		child->cached = true;
+		child->isTop = false;
+		child->parentContainer = currentInput.get();
+		currentInput->addChild(child.get());
+		currentInput->childContainers.push_back(child);
+	}
 	transformedInput.copyTo(child->M());
-	child->name = "Registered";
-	child->dirName = currentInput->dirName + "/Registered";
-	child->baseName = currentInput->baseName;
-	child->cached = true;
-	child->isTop = false;
 	child->save();
-	currentInput->addChild(child.get());
-	currentInput->childContainers.push_back(child);
+	if (currentSource->getChild("Registered") != NULL)
+	{
+		imgPtr srcChild(new imgContainer());
+		srcChild->name = "Registered";
+		srcChild->setText(0, "Registered");
+		srcChild->dirName = currentSource->dirName + "/Registered";
+		srcChild->baseName = currentInput->baseName;
+		srcChild->cached = true;
+		srcChild->isTop = false;
+		srcChild->parentContainer = currentSource.get();
+		currentSource->addChild(srcChild.get());
+		currentSource->childContainers.push_back(srcChild);
+	}
 }
 void 
 registrationDialog::on_btnCancel_clicked()

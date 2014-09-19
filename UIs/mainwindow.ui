@@ -44,6 +44,7 @@
     <addaction name="actionMerge_image_displays"/>
     <addaction name="actionRegistration"/>
     <addaction name="actionDraw_menu"/>
+    <addaction name="actionWear_Line_Extractor"/>
    </widget>
    <widget class="QMenu" name="menuBatch">
     <property name="title">
@@ -147,6 +148,11 @@
   <action name="actionDraw_menu">
    <property name="text">
     <string>Draw menu</string>
+   </property>
+  </action>
+  <action name="actionWear_Line_Extractor">
+   <property name="text">
+    <string>Tool Wear analyzer</string>
    </property>
   </action>
  </widget>

@@ -36,7 +36,8 @@ MainWindow::MainWindow(QWidget *parent) :
 	logFile(NULL),
 	regDialog(NULL),
 	drawWidget(NULL),
-	drawDialog(NULL)
+	drawDialog(NULL),
+	measurement(NULL)
     //saveDialog(new saveStreamDialog(this))
 {
 
@@ -149,9 +150,9 @@ MainWindow::MainWindow(QWidget *parent) :
 	stats = new imgStatsWidget(this, sources);
 	statDock = new QDockWidget(this);
 	statDock->setAllowedAreas(Qt::TopDockWidgetArea |
-		Qt::BottomDockWidgetArea |
-		Qt::LeftDockWidgetArea |
-		Qt::RightDockWidgetArea);
+								Qt::BottomDockWidgetArea |
+								Qt::LeftDockWidgetArea |
+								Qt::RightDockWidgetArea);
 	statDock->setFeatures(QDockWidget::DockWidgetClosable |
 		QDockWidget::DockWidgetFloatable |
 		QDockWidget::DockWidgetMovable);
@@ -207,6 +208,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->menuLabel_Images->addAction(filterDock->toggleViewAction());
     ui->menuLabel_Images->addAction(sourceDock->toggleViewAction());
     ui->menuLabel_Images->addAction(statDock->toggleViewAction());
+
 	
 	QAction* mlDialogAction = new QAction(this);
 	mlDialogAction->setText("Machine Learning Wizard");
@@ -223,6 +225,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->actionMerge_image_displays, SIGNAL(toggled(bool)), this,		SLOT(on_actionMergeImageDisplays(bool)));
 	connect(ui->actionRegistration,			SIGNAL(triggered()),   this,		SLOT(handleOpenRegistration()));
 	connect(ui->actionDraw_menu,			SIGNAL(triggered()),   this,		SLOT(handleOpenDrawMenu()));
+	connect(ui->actionWear_Line_Extractor,  SIGNAL(triggered()),   this,		SLOT(onOpenMeasurement()));
 	
 #endif
     ui->centralWidget->setLayout(layout);
@@ -500,6 +503,16 @@ MainWindow::handleLog(QString line, int level)
 	out << line;
 	out << "\n";
 	console->appendPlainText(line);
+}
+void
+MainWindow::onOpenMeasurement()
+{
+	if (measurement == NULL)
+	{
+		measurement = new measurementDialog(this, sources);
+		connect(measurement, SIGNAL(log(QString, int)), this, SLOT(handleLog(QString, int)));
+	}
+	measurement->show();
 }
 void 
 MainWindow::on_actionLabel_Images_triggered()

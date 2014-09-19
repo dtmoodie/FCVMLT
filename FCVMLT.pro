@@ -30,7 +30,8 @@ SOURCES += SRC/main.cpp\
     SRC/savestreamdialog.cpp \
     SRC/registrationdialog.cpp \
     SRC/drawtoolwidget.cpp \
-    matview.cpp
+    matview.cpp \
+    measurementdialog.cpp
 
 HEADERS  += headers/mainwindow.h \
     headers/container.h \
@@ -49,7 +50,8 @@ HEADERS  += headers/mainwindow.h \
     headers/savestreamdialog.h \
     headers/registrationdialog.h \
     headers/drawtoolwidget.h \
-    matview.h
+    matview.h \
+    measurementdialog.h
 
 FORMS    += UIs/mainwindow.ui \
     UIs/filterwidget.ui \
@@ -64,7 +66,8 @@ FORMS    += UIs/mainwindow.ui \
     UIs/savestreamdialog.ui \
     UIs/registrationdialog.ui \
     UIs/drawtoolwidget.ui \
-    matview.ui
+    matview.ui \
+    measurementdialog.ui
 
 
 INCLUDEPATH += C:/Opencv248/build/include

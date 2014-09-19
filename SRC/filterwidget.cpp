@@ -448,6 +448,7 @@ filterWidget::handleSaveImage()
     {
         filterContainer* cont = dynamic_cast<filterContainer*>(filterHistory->currentItem());
 		cont->cached = true;
+		// Create a dialog to ask the desired name of the filtered image
 		QDialog tmpDialog;
 		QGridLayout tmpLayout(&tmpDialog);
 		tmpDialog.setLayout(&tmpLayout);
@@ -537,18 +538,18 @@ filterWidget::saveImage(container* cont)
 	filterContainer* tmp = dynamic_cast<filterContainer*>(cont);
 	QString name = tmp->saveName;
     // Check to see if this exists already, if so, update the image
-	for (int i = 0; i < sourceImg->childCount(); ++i)
+	for (int i = 0; i < sourceImg->getParent()->childCount(); ++i)
     {
-		if (sourceImg->child(i)->text(0) == name)
+		if (sourceImg->getParent()->child(i)->text(0) == name)
 		{
-			imgContainer* child = dynamic_cast<imgContainer*>(sourceImg->child(i));
+			imgContainer* child = dynamic_cast<imgContainer*>(sourceImg->getParent()->child(i));
 			child->M() = tmp->M();
 			return;
 		}
     }
 	// Image doesn't already exist in the sources list, make a new object to hold it
 	// Upcast sourceImg to a QTreeWidgetItem* so that it isn't accidentally copied
-	imgPtr child(new imgContainer((QTreeWidgetItem*)sourceImg.get()));
+	imgPtr child(new imgContainer((QTreeWidgetItem*)sourceImg->getParent()));
 	child->parentContainer = cont;
 	child->setText(0,name);
 	tmp->M().copyTo(child->M());
@@ -562,8 +563,8 @@ filterWidget::saveImage(container* cont)
 	if (child->saved) child->save();
 	// Keep a pointer to the filter that created this image, so that if the image is saved to disk, we can tell update the filter accordingly.
 	//child->parentContainer = tmp;
-	sourceImg->addChild(child.get());
-	sourceImg->childContainers.push_back(child);
+	dynamic_cast<imgContainer*>(sourceImg->getParent())->addChild(child.get());
+	sourceImg->getParent()->childContainers.push_back(child);
 }
 // Idx is the index of the filter that needs to be updated, if -1, then update all filters for a new image
 void 
