@@ -1088,8 +1088,8 @@ featureWindowContainer::extractFeatures()
 				//							i * parameters[3].value,
 				//							parameters[0].value,
 				//							parameters[1].value));
-				cv::Mat tmp = output->_M;
-				curExtractor->extractFeatures(roi, output->_M.row(featureRowCount));
+                cv::Mat tmp = output->_M.row(featureRowCount);
+                curExtractor->extractFeatures(roi, tmp);
 				++featureRowCount;
 			}
 		}
@@ -1547,7 +1547,7 @@ cv::Mat&
 featureContainer::lbl()
 {
 	if (!label.empty()) return label;
-	if (filePath.size() == 0) return cv::Mat();
+    if (filePath.size() == 0) return label;
 	cv::FileStorage fs(filePath.toStdString(), cv::FileStorage::READ);
 	fs["label"] >> label;
 	return label;
