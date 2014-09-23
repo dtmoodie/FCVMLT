@@ -23,11 +23,3 @@ cv::Mat DLL_EXPORTED readDCM(std::string name)
 	cvImg.copyTo(out);
 	return out;
 }
-
-/*int main()
-{
-	readDCM("E:/data/images/test.dcm");
-	return 0;
-}*/
-
-

@@ -231,7 +231,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->centralWidget->setLayout(layout);
     centralWidget()->setLayout(layout);
     setWindowTitle("Main Window");
-}
+} // end of constructor
 
 MainWindow::~MainWindow()
 {

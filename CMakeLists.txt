@@ -46,7 +46,7 @@ set(CMAKE_AUTOMOC_MOC_OPTIONS "-bstdafx.h" "-fstdafx.h")
 
 
 FIND_PACKAGE(Qt5 COMPONENTS Gui Widgets Core OpenGL PrintSupport)
-FIND_PACKAGE(OpenCV 2.4.9 EXACT REQUIRED core imgproc highgui nonfree)
+FIND_PACKAGE(OpenCV REQUIRED core imgproc highgui nonfree)
 set(OpenCV_LIBS opencv_highgui opencv_imgproc opencv_nonfree opencv_core)
 
 FIND_PACKAGE(OpenGL)
@@ -93,7 +93,9 @@ add_definitions(-DNOMINMAX)
 source_group("Forms" 		FILES ${forms})
 source_group("UI Headers" 	FILES ${UIS})
 source_group("MOC'd files" 	FILES ${MOC})
-source_group("Linked Libraries" FILES ${QT_LIBRARIES})# ${OpenCV_LIBS} ${Boost_LIBRARIES} Qt5::Gui Qt5::Widgets Qt5::Core Qt5::OpenGL Qt5::PrintSupport ${OPENGL_LIBRARIES} ${SUBPROJECT_LIBS})
+source_group("Linked Libraries" FILES ${QT_LIBRARIES})
+
+# ${OpenCV_LIBS} ${Boost_LIBRARIES} Qt5::Gui Qt5::Widgets Qt5::Core Qt5::OpenGL Qt5::PrintSupport ${OPENGL_LIBRARIES} ${SUBPROJECT_LIBS})
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/Headers)
 INCLUDE_DIRECTORIES(${Boost_INCLUDE_DIR})
@@ -105,7 +107,6 @@ INCLUDE_DIRECTORIES(${Qt5Widgets_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5OpenGL_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${DLIB_PATH})
 
-
 ADD_EXECUTABLE(FCVMLT 
 	${sources} 
 	${MOC}
@@ -113,6 +114,7 @@ ADD_EXECUTABLE(FCVMLT
 	${headers} 
 	${UIS}
 )
+
 foreach(P ${SUBPROJECTS})
         add_dependencies(FCVMLT ${P})
         message("Adding Dependency: ${P}")
