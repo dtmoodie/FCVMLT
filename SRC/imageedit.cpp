@@ -688,7 +688,7 @@ imageEdit::changeImg(cv::Mat img, bool update)
 	{
 		try
 		{
-			cv::cvtColor(img, orgImg, CV_BGR2RGB);
+            cv::cvtColor(img, orgImg, BGR2RGB);
 		}
 		catch (cv::Exception &e)
 		{

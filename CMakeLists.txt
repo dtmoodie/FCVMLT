@@ -33,9 +33,9 @@ endmacro(ADD_SUB_PROJECTS)
 
 
 set(Qt5_DIR $ENV{Qt5_ROOT})
-set(OpenCV_DIR $ENV{OpenCV_ROOT})
+#set(OpenCV_DIR $ENV{OpenCV_ROOT})
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-
+set(OpenCV_DIR "/usr/local/opencv300/share/OpenCV/")
 set(SUBPROJECTS "")
 ADD_SUB_PROJECTS(${CMAKE_CURRENT_SOURCE_DIR} FCVMLT)
 SET(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/Bin/${CMAKE_BUILD_TYPE} CACHE PATH "Library output path")
@@ -47,10 +47,13 @@ set(CMAKE_AUTOMOC_MOC_OPTIONS "-bstdafx.h" "-fstdafx.h")
 
 
 FIND_PACKAGE(Qt5 COMPONENTS Gui Widgets Core OpenGL PrintSupport)
-FIND_PACKAGE(OpenCV REQUIRED core imgproc highgui nonfree)
-set(OpenCV_LIBS opencv_highgui opencv_imgproc opencv_nonfree opencv_core)
-message(Found opencv version: ${OpenCV_VERSION})
-
+FIND_PACKAGE(OpenCV REQUIRED core imgproc highgui)
+set(OpenCV_LIBS opencv_highgui opencv_imgproc opencv_core)
+message("Found opencv version: ${OpenCV_VERSION}")
+message("Opencv install path: ${OpenCV_INSTALL_PATH}")
+foreach(dir ${OpenCV_INCLUDE_DIRS})
+    message(${dir})
+endforeach(dir)
 
 FIND_PACKAGE(OpenGL)
 if( OPENGL_FOUND)

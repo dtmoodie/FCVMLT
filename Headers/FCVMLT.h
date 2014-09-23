@@ -1,5 +1,6 @@
 #ifndef CONTAINER_H
 #define CONTAINER_H
+
 // Contains anything that can be selected from a widget, such as a filter or a source image
 #include <QObject>
 #include <QString>
@@ -18,7 +19,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
-#include <opencv2/nonfree/nonfree.hpp>
+//#include <opencv2/nonfree/nonfree.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/ml/ml.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -27,8 +28,21 @@
 #include <boost/thread.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include <dlib/svm.h>
-#include <dlib/opencv.h>
+#if CV_VERSION_MAJOR == 2
+    #include <dlib/svm.h>
+    #include <dlib/opencv.h>
+    #define BGR2RGB CV_BGR2RGB
+
+#endif
+#if CV_VERSION_MAJOR == 3
+    #define BGR2RGB cv::COLOR_BGR2RGB
+    #define RGB2BGR cv::COLOR_RGB2BGR
+    #define BGR2GRAY cv::COLOR_BGR2GRAY;
+
+#endif
+
+
+
 
 #ifdef DICOM_LOADER_FOUND
 #include "subprojects/dicomLoader/dicomLoader.h"
@@ -67,8 +81,9 @@ typedef boost::shared_ptr<referenceContainer> referencePtr;
 
 // Machine learning dlib typedefs
 
-typedef dlib::matrix<double, 0, 1> sample_type;
-
+#if USE_DLIB
+    typedef dlib::matrix<double, 0, 1> sample_type;
+#endif
 
 enum filterType
 {
@@ -483,7 +498,12 @@ public:
 	bool		save();
 	bool		load();
 	mlType		MLType;
+#if CV_VERSION_MAJOR == 2
 	CvStatModel* classifier;
+#endif
+#if CV_VERSION_MAJOR == 3
+    cv::ml::StatModel* classifier;
+#endif
 	cv::Mat		normalizationParameters;
 signals:
 	void results(QString line);

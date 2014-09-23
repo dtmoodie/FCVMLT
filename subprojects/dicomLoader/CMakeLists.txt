@@ -6,12 +6,11 @@ if(WIN32)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 endif(WIN32)
 
+set(OpenCV_DIR "/usr/local/opencv300/share/OpenCV/")
 FIND_PACKAGE(OpenCV REQUIRED core)
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui)
 
-foreach(dir ${OpenCV_INCLUDE_DIRS})
-	message(${dir})
-endforeach(dir)
+
 
 
 file(GLOB sources "*.cpp" "base/src/*.cpp" "imebra/src/*.cpp")
