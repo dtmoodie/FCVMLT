@@ -654,7 +654,7 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featurePtr features, cv
 	{
 	case sift:
 	{
-        cv::SIFT sift;
+        cv::Feature2D::getAlgorithm("SIFT");
 		std::vector<cv::KeyPoint> keyPts;
 		sift(src, cv::Mat(), keyPts);
 		features->keyPts.reserve(keyPts.size());
@@ -681,7 +681,7 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featurePtr features, cv
 		cv::Mat lines;
 		cv::Mat img;
 		if (src.channels() != 1)
-			cv::cvtColor(src, img, CV_BGR2GRAY);
+            cv::cvtColor(src, img, BGR2GRAY);
 		else img = src;
 		cv::HoughLines(img, 
 			lines, 
@@ -722,7 +722,7 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featurePtr features, cv
 	{
 		cv::Mat img;
 		if (src.channels() != 1)
-			cv::cvtColor(src, img, CV_BGR2GRAY);
+            cv::cvtColor(src, img, BGR2GRAY);
 		else img = src;
 		cv::Mat lines;
 		cv::HoughLinesP(img,
@@ -740,17 +740,26 @@ featureExtractorContainer::extractKeyPoints(cv::Mat src, featurePtr features, cv
 			p1.y = line.val[1];
 			p2.x = line.val[2];
 			p2.y = line.val[3];
-			if (dispImg != NULL)
-				cv::line(*dispImg, p1, p2, cv::Scalar(0, 0, 255), 3, CV_AA);
+            if (dispImg != NULL)
+            {
+#if CV_VERSION_MAJOR == 2
+                cv::line(*dispImg, p1, p2, cv::Scalar(0, 0, 255), 3, CV_AA);
+#else
+                cv::line(*dispImg, p1, p2, cv::Scalar(0, 0, 255), 3, cv::LINE_AA);
+#endif
+            }
 		}
 		features->M() = lines;
 		break;
 	}
 	case circle:
-	{
-		//std::vector<cv::Vec3f> circles;
+    {
 		cv::Mat circles;
-		cv::HoughCircles(src, circles, CV_HOUGH_GRADIENT,
+        #if CV_VERSION_MAJOR == 2
+        cv::HoughCircles(src, circles, CV_HOUGH_GRADIENT,
+                 #else
+        cv::HoughCircles(src, circles, cv::HOUGH_GRADIENT,
+        #endif
 			parameters[0].value,
 			parameters[1].value,
 			parameters[2].value,
@@ -1088,8 +1097,8 @@ featureWindowContainer::extractFeatures()
 				//							i * parameters[3].value,
 				//							parameters[0].value,
 				//							parameters[1].value));
-				cv::Mat tmp = output->_M;
-				curExtractor->extractFeatures(roi, output->_M.row(featureRowCount));
+                cv::Mat tmp = output->_M.row(featureRowCount);
+                curExtractor->extractFeatures(roi, tmp);
 				++featureRowCount;
 			}
 		}
@@ -1547,7 +1556,7 @@ cv::Mat&
 featureContainer::lbl()
 {
 	if (!label.empty()) return label;
-	if (filePath.size() == 0) return cv::Mat();
+    if (filePath.size() == 0) return label;
 	cv::FileStorage fs(filePath.toStdString(), cv::FileStorage::READ);
 	fs["label"] >> label;
 	return label;

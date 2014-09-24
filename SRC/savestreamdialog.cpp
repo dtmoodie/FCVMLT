@@ -10,7 +10,12 @@ saveStreamDialog::saveStreamDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 	//fourCC = CV_FOURCC('H', '2', '6', '4');
+#if CV_VERSION_MAJOR == 2
 	fourCC = CV_FOURCC('M', 'J', 'P', 'G');
+#endif
+#if CV_VERSION_MAJOR == 3
+    fourCC = cv::VideoWriter::fourcc('M','J','P','G');
+#endif
     ui->resolution->addItem("1920x1080");
     ui->resolution->addItem("1280x720");
     ui->resolution->addItem("640x480");

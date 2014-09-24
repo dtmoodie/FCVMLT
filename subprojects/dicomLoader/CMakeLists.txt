@@ -6,14 +6,18 @@ if(WIN32)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 endif(WIN32)
 
+set(OpenCV_DIR "/usr/local/opencv300/share/OpenCV/")
 FIND_PACKAGE(OpenCV REQUIRED core)
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui)
 
-INCLUDE_DIRECTORIES(${OPENCV_INCLUDE_DIR})
+
+
+
 file(GLOB sources "*.cpp" "base/src/*.cpp" "imebra/src/*.cpp")
 file(GLOB headers "*.h" "base/include/*.h" "imebra/include/*.h")
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/Headers)
+INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
 
 
 add_library(dicomLoader SHARED
