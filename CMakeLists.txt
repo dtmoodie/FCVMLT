@@ -29,8 +29,9 @@ macro(ADD_SUB_PROJECTS curDir parent)
 			message(${SUBPROJECT_LIBS})
 		endif(${PROJECT_NAME}_FOUND)
 	endforeach(subproject)
-endmacro(ADD_SUB_PROJECTS)
 
+endmacro(ADD_SUB_PROJECTS)
+ 
 
 set(Qt5_DIR $ENV{Qt5_ROOT})
 #set(OpenCV_DIR $ENV{OpenCV_ROOT})
